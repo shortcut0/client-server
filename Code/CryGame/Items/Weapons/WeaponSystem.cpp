@@ -189,7 +189,7 @@ void CWeaponSystem::Reload()
 
 	m_tracerManager.Reset();
 
-	this->RegisterAmmoData();
+	this->RegisterXMLData();
 
 	m_reloading = false;
 }
