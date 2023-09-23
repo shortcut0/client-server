@@ -611,7 +611,7 @@ void Launcher::StartEngine()
 	}
 	else
 	{
-		pGameFramework = &GameFramework::GetInstance();
+		pGameFramework = GameFramework::GetInstance();
 	}
 
 	GameWindow::GetInstance().Init();
