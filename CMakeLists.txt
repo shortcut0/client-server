@@ -666,6 +666,8 @@ add_executable(${CRYMP_CLIENT_EXE} WIN32
 	Code/CrySystem/CryLog.h
 	Code/CrySystem/CryMemoryManager.cpp
 	Code/CrySystem/CryMemoryManager.h
+	Code/CrySystem/CryPak.cpp
+	Code/CrySystem/CryPak.h
 	Code/CrySystem/GameWindow.cpp
 	Code/CrySystem/GameWindow.h
 	Code/CrySystem/HardwareMouse.cpp
@@ -674,8 +676,22 @@ add_executable(${CRYMP_CLIENT_EXE} WIN32
 	Code/CrySystem/LocalizationManager.h
 	Code/CrySystem/Logger.cpp
 	Code/CrySystem/Logger.h
+	Code/CrySystem/Pak/FileOutsidePak.cpp
+	Code/CrySystem/Pak/FileOutsidePak.h
+	Code/CrySystem/Pak/IPak.h
+	Code/CrySystem/Pak/IPakFile.h
+	Code/CrySystem/Pak/PakLoader.cpp
+	Code/CrySystem/Pak/PakLoader.h
+	Code/CrySystem/Pak/ZipPak.cpp
+	Code/CrySystem/Pak/ZipPak.h
+	Code/CrySystem/Pak/ZipPakFile.cpp
+	Code/CrySystem/Pak/ZipPakFile.h
 	Code/CrySystem/RandomGenerator.cpp
 	Code/CrySystem/RandomGenerator.h
+	Code/CrySystem/ResourceList.cpp
+	Code/CrySystem/ResourceList.h
+	Code/CrySystem/StreamEngine.cpp
+	Code/CrySystem/StreamEngine.h
 	Code/Launcher/Launcher.cpp
 	Code/Launcher/Launcher.h
 	Code/Launcher/Main.cpp
@@ -686,6 +702,7 @@ add_executable(${CRYMP_CLIENT_EXE} WIN32
 	Code/Library/CPUID.h
 	Code/Library/CrashLogger.cpp
 	Code/Library/CrashLogger.h
+	Code/Library/SlotVector.h
 	Code/Library/StringTools.cpp
 	Code/Library/StringTools.h
 	Code/Library/Util.cpp
