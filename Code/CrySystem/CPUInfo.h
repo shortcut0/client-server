@@ -1,5 +1,9 @@
 #pragma once
 
+// Server
+struct ISystem;
+
+
 /**
  * Reverse engineered CryEngine 2 structure with CPU information.
  *
@@ -37,7 +41,7 @@ struct CPUInfo
 
 	Core cores[MAX_CORE_COUNT];
 
-	static void Detect(CPUInfo* self);
+	static void Detect(CPUInfo* self, ISystem *pSystem);
 };
 
 static_assert(sizeof(CPUInfo) == 8720);

@@ -38,12 +38,15 @@ History:
 #include "CryCommon/CryCore/StlUtils.h"
 #include "Library/Util.h"
 
+// Server
+#include "CryMP/Server/Server.h"
+
 
 //------------------------------------------------------------------------
 void CGameRules::ValidateShot(EntityId playerId, EntityId weaponId, uint16 seq, uint8 seqr)
 {
-	if (m_pShotValidator)
-		m_pShotValidator->AddShot(playerId, weaponId, seq, seqr);
+	//if (m_pShotValidator)
+	//	m_pShotValidator->AddShot(playerId, weaponId, seq, seqr);
 }
 
 //------------------------------------------------------------------------
@@ -236,22 +239,28 @@ void CGameRules::ServerHit(const HitInfo& hitInfo)
 		}
 	}
 
-	if (m_processingHit)
-	{
-		m_queuedHits.push(info);
-		return;
-	}
+	// Server
+	if (g_pServerCVars->server_use_hit_queue > 0) {
+		if (m_processingHit)
+		{
+			m_queuedHits.push(info);
+			return;
+		}
+	} // ...
+
 
 	++m_processingHit;
-
 	ProcessServerHit(info);
 
-	while (!m_queuedHits.empty())
-	{
-		HitInfo qinfo(m_queuedHits.front());
-		ProcessServerHit(qinfo);
-		m_queuedHits.pop();
-	}
+	// Server
+	if (g_pServerCVars->server_use_hit_queue > 0) {
+		while (!m_queuedHits.empty())
+		{
+			HitInfo qinfo(m_queuedHits.front());
+			ProcessServerHit(qinfo);
+			m_queuedHits.pop();
+		}
+	} // ...
 
 	--m_processingHit;
 }
@@ -259,8 +268,8 @@ void CGameRules::ServerHit(const HitInfo& hitInfo)
 //------------------------------------------------------------------------
 void CGameRules::ProcessServerHit(HitInfo& hitInfo)
 {
-	if (m_pShotValidator && !m_pShotValidator->ProcessHit(hitInfo))
-		return;
+	//if (m_pShotValidator && !m_pShotValidator->ProcessHit(hitInfo))
+	//	return;
 
 	bool ok = true;
 	// check if shooter is alive
@@ -314,7 +323,12 @@ void CGameRules::ProcessServerHit(HitInfo& hitInfo)
 //------------------------------------------------------------------------
 void CGameRules::ServerExplosion(const ExplosionInfo& explosionInfo)
 {
-	m_queuedExplosions.push(explosionInfo);
+	// Server
+	if (g_pServerCVars->server_use_explosion_queue > 0) {
+		m_queuedExplosions.push(explosionInfo);
+	}
+	else
+		ProcessServerExplosion(explosionInfo);
 }
 
 //------------------------------------------------------------------------
@@ -329,8 +343,13 @@ void CGameRules::ProcessServerExplosion(const ExplosionInfo& explosionInfo)
 //------------------------------------------------------------------------
 void CGameRules::ProcessQueuedExplosions()
 {
-	const static uint8 nMaxExp = 3;
+	// Server
+	if (g_pServerCVars->server_use_explosion_queue <= 0) {
+		return;
+	}
 
+
+	const static uint8 nMaxExp = 3;
 	for (uint8 exp = 0; !m_queuedExplosions.empty() && exp < nMaxExp; ++exp)
 	{
 		ExplosionInfo info(m_queuedExplosions.front());

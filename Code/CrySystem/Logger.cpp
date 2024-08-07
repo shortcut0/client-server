@@ -366,15 +366,11 @@ void Logger::UpdateLoadingScreen(const char* format, ...)
 
 void Logger::RegisterConsoleVariables()
 {
-	if (!gEnv)
-	{
+	if (!gEnv) {
 		return;
 	}
-
 	IConsole* pConsole = gEnv->pConsole;
-
-	if (!pConsole)
-	{
+	if (!pConsole) {
 		return;
 	}
 

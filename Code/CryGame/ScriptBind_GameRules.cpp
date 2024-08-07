@@ -82,6 +82,10 @@ void CScriptBind_GameRules::RegisterMethods()
 #undef SCRIPT_REG_CLASSNAME
 #define SCRIPT_REG_CLASSNAME &CScriptBind_GameRules::
 
+	// Server
+	SCRIPT_REG_FUNC(InitScriptTables);
+	// ...
+
 	SCRIPT_REG_TEMPLFUNC(IsServer, "");
 	SCRIPT_REG_TEMPLFUNC(IsClient, "");
 	SCRIPT_REG_TEMPLFUNC(CanCheat, "");
@@ -257,6 +261,7 @@ void CScriptBind_GameRules::RegisterMethods()
 	SCRIPT_REG_TEMPLFUNC(PerformDeadHit, "");
 }
 
+
 //------------------------------------------------------------------------
 CGameRules* CScriptBind_GameRules::GetGameRules(IFunctionHandler* pH)
 {
@@ -281,6 +286,18 @@ void CScriptBind_GameRules::AttachTo(CGameRules* pGameRules)
 
 		pScriptTable->SetValue("game", thisTable);
 	}
+}
+
+
+//------------------------------------------------------------------------
+int CScriptBind_GameRules::InitScriptTables(IFunctionHandler* pH)
+{
+	CGameRules* pGameRules = GetGameRules(pH);
+	if (!pGameRules)
+		return pH->EndFunction();
+
+	pGameRules->InitScriptTables();
+	return pH->EndFunction();
 }
 
 //------------------------------------------------------------------------
@@ -1540,9 +1557,16 @@ int CScriptBind_GameRules::SendTextMessage(IFunctionHandler* pH, int type, const
 int CScriptBind_GameRules::SendChatMessage(IFunctionHandler* pH, int type, ScriptHandle sourceId, ScriptHandle targetId, const char* msg)
 {
 	CGameRules* pGameRules = GetGameRules(pH);
+	int forcedteam = -1;
+	if (pH->GetParamCount() >= 5)
+		pH->GetParam(5, forcedteam);
 
 	if (!pGameRules)
 		return pH->EndFunction();
+
+
+	pGameRules->m_chatScriptBind_forcedTeam = forcedteam;
+	pGameRules->m_chatScriptBind_svChat = true;
 
 	pGameRules->SendChatMessage((EChatMessageType)type, (EntityId)sourceId.n, (EntityId)targetId.n, msg);
 

@@ -3,6 +3,10 @@
 #include <cstdarg>
 #include <cstddef>
 
+// Server
+struct ISystem;
+
+// ---
 struct CPUInfo;
 
 namespace MemoryPatch
@@ -80,7 +84,7 @@ namespace MemoryPatch
 		void DisableIOErrorLog(void* pCrySystem);
 		void FixCPUInfoOverflow(void* pCrySystem);
 		void FixFlashAllocatorUnderflow(void* pCrySystem);
-		void HookCPUDetect(void* pCrySystem, void (*handler)(CPUInfo* info));
+		void HookCPUDetect(void* pCrySystem, void (*handler)(CPUInfo* info, ISystem* pSystem));
 		void HookError(void* pCrySystem, void (*handler)(const char* format, va_list args));
 		void MakeDX9Default(void* pCrySystem);
 		void RemoveSecuROM(void* pCrySystem);

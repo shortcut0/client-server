@@ -47,6 +47,9 @@
 #include "CryMP/Client/Client.h"
 #include "CryMP/Client/ScriptCallbacks.h"
 
+// Server
+#include "CryMP/Server/Server.h"
+
 int CGameRules::s_invulnID = 0;
 int CGameRules::s_barbWireID = 0;
 
@@ -123,22 +126,18 @@ bool CGameRules::Init(IGameObject* pGameObject)
 	s_invulnID = m_pMaterialManager->GetSurfaceTypeManager()->GetSurfaceTypeByName("mat_invulnerable")->GetId();
 	s_barbWireID = m_pMaterialManager->GetSurfaceTypeManager()->GetSurfaceTypeByName("mat_metal_barbwire")->GetId();
 
-	if (gEnv->bServer && gEnv->bMultiplayer)
-		m_pShotValidator = new CShotValidator(this, m_pGameFramework->GetIItemSystem(), m_pGameFramework);
+	// Server
+	//if (gEnv->bServer && gEnv->bMultiplayer)
+	//	m_pShotValidator = new CShotValidator(this, m_pGameFramework->GetIItemSystem(), m_pGameFramework);
 
 	//Register as ViewSystem listener (for cut-scenes, ...)
 	if (m_pGameFramework->GetIViewSystem())
 		m_pGameFramework->GetIViewSystem()->AddListener(this);
 
-	m_script = GetEntity()->GetScriptTable();
-	m_script->GetValue("Client", m_clientScript);
-	m_script->GetValue("Server", m_serverScript);
-	m_script->GetValue("OnCollision", m_onCollisionFunc);
+	// Server
+	InitScriptTables();
 
 	m_collisionTable = gEnv->pScriptSystem->CreateTable();
-
-	m_clientStateScript = m_clientScript;
-	m_serverStateScript = m_serverScript;
 
 	m_scriptHitInfo.Create(gEnv->pScriptSystem);
 	m_scriptExplosionInfo.Create(gEnv->pScriptSystem);
@@ -189,7 +188,7 @@ bool CGameRules::Init(IGameObject* pGameObject)
 
 	if (isMultiplayer && gEnv->bClient && !gEnv->pSystem->IsDedicated() && !strcmp(GetEntity()->GetClass()->GetName(), "PowerStruggle"))
 	{
-		m_pMPTutorial = new CMPTutorial;
+		m_pMPTutorial = new CMPTutorial; 
 	}
 
 	SAFE_HUD_FUNC(GameRulesSet(GetEntity()->GetClass()->GetName()));
@@ -198,6 +197,19 @@ bool CGameRules::Init(IGameObject* pGameObject)
 		m_pVotingSystem = new CVotingSystem;
 
 	return true;
+}
+
+//------------------------------------------------------------------------
+void CGameRules::InitScriptTables() {
+
+
+	m_script = GetEntity()->GetScriptTable();
+	m_script->GetValue("Client", m_clientScript);
+	m_script->GetValue("Server", m_serverScript);
+	m_script->GetValue("OnCollision", m_onCollisionFunc);
+
+	m_clientStateScript = m_clientScript;
+	m_serverStateScript = m_serverScript;
 }
 
 //------------------------------------------------------------------------
@@ -211,7 +223,14 @@ void CGameRules::PostInit(IGameObject* pGameObject)
 	RegisterConsoleCommands(pConsole);
 	RegisterConsoleVars(pConsole);
 
-	gClient->GetScriptCallbacks()->OnGameRulesCreated(GetEntityId());
+	if (gClient)
+		gClient->GetScriptCallbacks()->OnGameRulesCreated(GetEntityId());
+
+	// Server
+	if (gServer) {
+		gServer->OnGameStart(pGameObject);
+		gServer->GetEvents()->OnGameRulesCreated(GetEntityId());
+	}
 }
 
 //------------------------------------------------------------------------
@@ -319,8 +338,9 @@ void CGameRules::Update(SEntityUpdateContext& ctx, int updateSlot)
 		ProcessQueuedExplosions();
 		UpdateEntitySchedules(ctx.fFrameTime);
 
-		if (m_pShotValidator)
-			m_pShotValidator->Update();
+		// Server
+		//if (m_pShotValidator)
+		//	m_pShotValidator->Update();
 
 		if (gEnv->bMultiplayer)
 		{
@@ -380,16 +400,29 @@ void CGameRules::ProcessEvent(SEntityEvent& event)
 	switch (event.event)
 	{
 	case ENTITY_EVENT_RESET:
-		if (m_pShotValidator)
-			m_pShotValidator->Reset();
+		
+		// Server
+		//if (m_pShotValidator)
+		//	m_pShotValidator->Reset();
+
+
 		m_timeOfDayInitialized = false;
 		ResetFrozen();
 
-		while (!m_queuedExplosions.empty())
-			m_queuedExplosions.pop();
+		// Server
+		if (g_pServerCVars->server_use_explosion_queue > 0) {
+			while (!m_queuedExplosions.empty())
+				m_queuedExplosions.pop();
+		}
 
-		while (!m_queuedHits.empty())
-			m_queuedHits.pop();
+		
+		// Server
+		if (g_pServerCVars->server_use_hit_queue > 0) {
+			while (!m_queuedHits.empty())
+				m_queuedHits.pop();
+		}
+
+
 		m_processingHit = 0;
 
 		// TODO: move this from here
@@ -553,8 +586,9 @@ bool CGameRules::OnClientConnect(int channelId, bool isReset)
 		AddChannel(channelId);
 		g_pGame->GetServerSynchedStorage()->OnClientConnect(channelId);
 
-		if (m_pShotValidator)
-			m_pShotValidator->Connected(channelId);
+		// Server
+		//if (m_pShotValidator)
+		//	m_pShotValidator->Connected(channelId);
 	}
 
 	if (gEnv->bServer && gEnv->bMultiplayer)
@@ -601,15 +635,32 @@ bool CGameRules::OnClientConnect(int channelId, bool isReset)
 //------------------------------------------------------------------------
 void CGameRules::OnClientDisconnect(int channelId, EDisconnectionCause cause, const char* desc, bool keepClient)
 {
-	if (m_pShotValidator)
-		m_pShotValidator->Disconnected(channelId);
-
+	
+	// Server
+	//if (m_pShotValidator)
+	//	m_pShotValidator->Disconnected(channelId);
+	
 	CActor* pActor = GetActorByChannelId(channelId);
 	//assert(pActor);
 
-	if (!pActor || !keepClient)
+	// Server
+	if (!pActor)
+		gServer->GetEvents()->Call("ServerRPC.Callbacks.OnChannelDisconnect", channelId, desc);
+	
+	if (pActor)
+	{
+		if (IEntity *pEntity = pActor->GetEntity())
+			gServer->GetEvents()->Call("ServerRPC.Callbacks.OnClientDisconnect", channelId, pEntity->GetScriptTable(), desc);
+	}
+		
+	
+
+	if (!pActor || !keepClient) {
+
+
 		if (g_pGame->GetServerSynchedStorage())
 			g_pGame->GetServerSynchedStorage()->OnClientDisconnect(channelId, false);
+	}
 
 	if (!pActor)
 		return;
@@ -722,6 +773,7 @@ void CGameRules::OnChatMessage(EChatMessageType type, EntityId sourceId, EntityI
 {
 	if (sourceId == targetId && (strstr(msg, "!rpc ") == msg || strstr(msg, "!validate ") == msg))
 		return;
+
 	//send chat message to hud
 	int teamFaction = 0;
 	if (IActor* pActor = gEnv->pGame->GetIGameFramework()->GetClientActor())
@@ -2791,6 +2843,10 @@ void CGameRules::SendTextMessage(ETextMessageType type, const char* msg, unsigne
 //------------------------------------------------------------------------
 bool CGameRules::CanReceiveChatMessage(EChatMessageType type, EntityId sourceId, EntityId targetId) const
 {
+
+	if (g_pServerCVars->server_classic_chat <= 0) 
+		return true;
+
 	if (sourceId == targetId)
 		return true;
 
@@ -2863,49 +2919,58 @@ void CGameRules::SendChatMessage(EChatMessageType type, EntityId sourceId, Entit
 
 	if (gEnv->bServer)
 	{
-		switch (type)
-		{
-		case eChatToTarget:
-		{
-			if (CanReceiveChatMessage(type, sourceId, targetId))
-				GetGameObject()->InvokeRMIWithDependentObject(ClChatMessage(), params, eRMI_ToClientChannel, targetId, GetChannelId(targetId));
-		}
-		break;
-		case eChatToAll:
-		{
-			std::vector<int>::const_iterator begin = m_channelIds.begin();
-			std::vector<int>::const_iterator end = m_channelIds.end();
-
-			for (std::vector<int>::const_iterator it = begin; it != end; ++it)
+		bool show = true;
+		gServer->GetEvents()->Get("ServerRPC.Callbacks.OnChatMessage", show, int(type), ScriptHandle(sourceId), ScriptHandle(targetId), msg, m_chatScriptBind_forcedTeam, m_chatScriptBind_svChat);
+		
+		CryLogAlways("Show = %s", show ? "yes" : "no");
+		if (show) {
+			switch (type)
 			{
-				if (CActor* pActor = GetActorByChannelId(*it))
-				{
-					if (CanReceiveChatMessage(type, sourceId, pActor->GetEntityId()) && IsPlayerInGame(pActor->GetEntityId()))
-						GetGameObject()->InvokeRMIWithDependentObject(ClChatMessage(), params, eRMI_ToClientChannel, pActor->GetEntityId(), *it);
-				}
+			case eChatToTarget:
+			{
+				if (CanReceiveChatMessage(type, sourceId, targetId))
+					GetGameObject()->InvokeRMIWithDependentObject(ClChatMessage(), params, eRMI_ToClientChannel, targetId, GetChannelId(targetId));
 			}
-		}
-		break;
-		case eChatToTeam:
-		{
-			int teamId = GetTeam(sourceId);
-			if (teamId)
+			break;
+			case eChatToAll:
 			{
-				TPlayerTeamIdMap::const_iterator tit = m_playerteams.find(teamId);
-				if (tit != m_playerteams.end())
-				{
-					TPlayers::const_iterator begin = tit->second.begin();
-					TPlayers::const_iterator end = tit->second.end();
+				std::vector<int>::const_iterator begin = m_channelIds.begin();
+				std::vector<int>::const_iterator end = m_channelIds.end();
 
-					for (TPlayers::const_iterator it = begin; it != end; ++it)
+				for (std::vector<int>::const_iterator it = begin; it != end; ++it)
+				{
+					if (CActor* pActor = GetActorByChannelId(*it))
 					{
-						if (CanReceiveChatMessage(type, sourceId, *it))
-							GetGameObject()->InvokeRMIWithDependentObject(ClChatMessage(), params, eRMI_ToClientChannel, *it, GetChannelId(*it));
+						if (CanReceiveChatMessage(type, sourceId, pActor->GetEntityId()) && IsPlayerInGame(pActor->GetEntityId()))
+							GetGameObject()->InvokeRMIWithDependentObject(ClChatMessage(), params, eRMI_ToClientChannel, pActor->GetEntityId(), *it);
 					}
 				}
 			}
-		}
-		break;
+			break;
+			case eChatToTeam:
+			{
+				int teamId = GetTeam(sourceId);
+				if (m_chatScriptBind_forcedTeam >= 0)
+					teamId = m_chatScriptBind_forcedTeam;
+
+				if (teamId)
+				{
+					TPlayerTeamIdMap::const_iterator tit = m_playerteams.find(teamId);
+					if (tit != m_playerteams.end())
+					{
+						TPlayers::const_iterator begin = tit->second.begin();
+						TPlayers::const_iterator end = tit->second.end();
+
+						for (TPlayers::const_iterator it = begin; it != end; ++it)
+						{
+							if (CanReceiveChatMessage(type, sourceId, *it))
+								GetGameObject()->InvokeRMIWithDependentObject(ClChatMessage(), params, eRMI_ToClientChannel, *it, GetChannelId(*it));
+						}
+					}
+				}
+			}
+			break;
+			}
 		}
 	}
 	else
@@ -2917,6 +2982,10 @@ void CGameRules::SendChatMessage(EChatMessageType type, EntityId sourceId, Entit
 			GetGameObject()->InvokeRMI(SvRequestChatMessage(), params, eRMI_ToServer);
 		}
 	}
+
+	// Server
+	m_chatScriptBind_forcedTeam = -1;
+	m_chatScriptBind_svChat = false;
 }
 
 //------------------------------------------------------------------------
@@ -3556,11 +3625,20 @@ void CGameRules::ResetEntities()
 
 	ResetFrozen();
 
-	while (!m_queuedExplosions.empty())
-		m_queuedExplosions.pop();
+	// Server
+	if (g_pServerCVars->server_use_explosion_queue > 0) {
+		while (!m_queuedExplosions.empty())
+			m_queuedExplosions.pop();
+	}
 
-	while (!m_queuedHits.empty())
-		m_queuedHits.pop();
+
+	// Server
+	if (g_pServerCVars->server_use_hit_queue > 0) {
+		while (!m_queuedHits.empty())
+			m_queuedHits.pop();
+	}
+
+
 	m_processingHit = 0;
 
 	// remove voice groups too. They'll be recreated when players are put back on their teams after reset.

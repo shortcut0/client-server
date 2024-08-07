@@ -370,7 +370,8 @@ int CGame::Update(bool haveFocus, unsigned int updateFlags)
 
 	m_pFramework->PostUpdate(true, updateFlags);
 
-	CheckReloadLevel();
+	// Server (Commented)
+	//CheckReloadLevel();
 
 	return bRun ? 1 : 0;
 }

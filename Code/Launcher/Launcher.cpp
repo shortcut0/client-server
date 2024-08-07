@@ -26,6 +26,8 @@
 
 #include "config.h"
 
+#include "CryMP/Server/Server.h"
+
 static void LogBytes(const char* message, std::size_t bytes)
 {
 	const char* unit = "";
@@ -241,6 +243,7 @@ static void ReplaceLocalizationManager(void* pCrySystem)
 
 		static void InitLocalizationManager(const char* defaultLanguage)
 		{
+			/*
 			CryLogAlways("$3[CryMP] Initializing Localization Manager");
 
 			ICVar* pLanguageCVar = gEnv->pConsole->GetCVar("g_language");
@@ -254,6 +257,7 @@ static void ReplaceLocalizationManager(void* pCrySystem)
 			}
 
 			LocalizationManager::GetInstance().SetLanguage(language.data());
+			*/
 		}
 	};
 
@@ -465,7 +469,7 @@ void Launcher::SetCmdLine()
 
 	m_params.cmdLine[cmdLine.length()] = '\0';
 }
-
+#include <windows.h>
 void Launcher::InitWorkingDirectory()
 {
 	std::filesystem::path dir;
@@ -478,6 +482,9 @@ void Launcher::InitWorkingDirectory()
 	{
 		dir = WinAPI::GetApplicationPath().remove_filename();
 	}
+
+	// Server (Debug)
+	//dir = "C:\\USers\\me\\Desktop\\Server - ATOM";
 
 	// sanitize the path
 	dir = dir.lexically_normal();
@@ -687,6 +694,7 @@ void Launcher::PatchEngine()
 
 	if (m_dlls.pCrySystem)
 	{
+
 		MemoryPatch::CrySystem::AllowDX9VeryHighSpec(m_dlls.pCrySystem);
 		MemoryPatch::CrySystem::AllowMultipleInstances(m_dlls.pCrySystem);
 		MemoryPatch::CrySystem::DisableIOErrorLog(m_dlls.pCrySystem);
@@ -716,7 +724,7 @@ void Launcher::PatchEngine()
 		}
 	}
 
-	const char* GAME_WINDOW_NAME = "CryMP Client " CRYMP_CLIENT_VERSION_STRING;
+	const char* GAME_WINDOW_NAME = "CryMP ATOM Server " CRYMP_CLIENT_VERSION_STRING;
 
 	if (m_dlls.pCryRenderD3D9)
 	{
@@ -766,7 +774,9 @@ void Launcher::StartEngine()
 	TracyHookEngineProfiler();
 #endif
 
-	gClient->Init(pGameFramework);
+	
+	//gClient->Init(pGameFramework);
+	gServer->Init(pGameFramework);
 
 	if (!pGameFramework->CompleteInit())
 	{
@@ -808,10 +818,13 @@ void Launcher::OnInit(ISystem* pSystem)
 
 	const std::filesystem::path mainDirPath = std::filesystem::current_path();
 	const std::filesystem::path userDirPath = std::filesystem::canonical(gEnv->pCryPak->GetAlias("%USER%"));
-	const std::filesystem::path rootDirPath = std::filesystem::canonical(gEnv->pSystem->GetRootFolder());
+	std::filesystem::path rootDirPath = std::filesystem::canonical(gEnv->pSystem->GetRootFolder());
+
+	// Server (Debug)
+	//rootDirPath = "C:/Users/me/Desktop/Server - ATOM/ATOM - 2024/";
 
 	const char* defaultVerbosity = "0";
-	const char* defaultLogFileName = "CryMP-Client.log";
+	const char* defaultLogFileName = "Logs\\CryMP-Server.log";
 	const char* defaultLogPrefix = "";
 
 	const int verbosity = std::atoi(WinAPI::CmdLine::GetArgValue("-verbosity", defaultVerbosity));
@@ -822,6 +835,9 @@ void Launcher::OnInit(ISystem* pSystem)
 
 	logger.SetVerbosity(verbosity);
 	logger.OpenFile((rootDirPath.empty() ? userDirPath : rootDirPath) / logFileName);
+	
+	// Server FIXME: Move Launcher::OnInit to a better place
+	logger.RegisterConsoleVariables();
 
 	CrashLogger::Enable(&ProvideLogFile, &CryMemoryManager::ProvideHeapInfo);
 
@@ -841,10 +857,11 @@ void Launcher::OnInit(ISystem* pSystem)
 	const SFileVersion& version = gEnv->pSystem->GetProductVersion();
 
 	logger.LogAlways("Crysis %d.%d.%d.%d " CRYMP_CLIENT_BITS, version[3], version[2], version[1], version[0]);
-	logger.LogAlways("CryMP Client " CRYMP_CLIENT_VERSION_STRING " " CRYMP_CLIENT_BITS " " CRYMP_CLIENT_BUILD_TYPE);
+	logger.LogAlways("CryMP Server " CRYMP_CLIENT_VERSION_STRING " " CRYMP_CLIENT_BITS " " CRYMP_CLIENT_BUILD_TYPE);
 	logger.LogAlways("Compiled by " CRYMP_CLIENT_COMPILER);
 	logger.LogAlways("Copyright (C) 2001-2008 Crytek GmbH");
 	logger.LogAlways("Copyright (C) 2014-2024 CryMP");
+	logger.LogAlways("Copyright (C) 2014-2024 Marisa");
 	logger.LogAlways("");
 
 	logger.SetPrefix(logPrefix);
@@ -868,7 +885,10 @@ void Launcher::GetMemoryUsage(ICrySizer* pSizer)
 void Launcher::Run()
 {
 	m_params.hInstance = WinAPI::DLL::Get(nullptr);  // EXE handle
-	m_params.pUserCallback = this;
+	
+	//m_params.pUserCallback = this;
+	m_params.isDedicatedServer = true;
+	
 	m_params.pLog = &Logger::GetInstance();
 
 	this->SetCmdLine();
@@ -885,7 +905,7 @@ void Launcher::Run()
 
 	if (WinAPI::CmdLine::HasArg("-dedicated") || m_params.isDedicatedServer)
 	{
-		throw StringTools::ErrorFormat("Running as a dedicated server is not supported!");
+	//	throw StringTools::ErrorFormat("Running as a dedicated server is not supported!");
 	}
 
 	this->InitWorkingDirectory();
@@ -895,10 +915,14 @@ void Launcher::Run()
 
 	RandomGenerator::Init();
 
-	Client client;
-	gClient = &client;
+	//Client client;
+	//gClient = &client;
+
+	Server server;
+	gServer = &server;
 
 	this->StartEngine();
 
-	gClient->UpdateLoop();
+	gServer->UpdateLoop();
+	//gClient->UpdateLoop();
 }

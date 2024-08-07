@@ -23,7 +23,8 @@ HardwareMouse::HardwareMouse()
 
 HardwareMouse::~HardwareMouse()
 {
-	gEnv->pInput->RemoveEventListener(this);
+	if (gEnv->pInput)
+		gEnv->pInput->RemoveEventListener(this);
 	gEnv->pSystem->GetISystemEventDispatcher()->RemoveListener(this);
 }
 
@@ -311,7 +312,8 @@ void HardwareMouse::ShowCursor(bool show)
 
 	this->ConfineCursor(!show || this->IsFullscreen() || !gEnv->pSystem->IsDevMode());
 
-	gEnv->pInput->SetExclusiveMode(eDI_Mouse, false);
+	if (gEnv->pInput)
+		gEnv->pInput->SetExclusiveMode(eDI_Mouse, false);
 }
 
 bool HardwareMouse::IsFullscreen()

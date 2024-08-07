@@ -17,6 +17,9 @@
 #include "CryGame/Game.h"
 #include "CryGame/GameRules.h"
 
+// Server
+#include "CryMP/Server/Server.h"
+
 /*
 #define CHECK_OWNER_REQUEST()	\
 	{ \
@@ -455,6 +458,8 @@ IMPLEMENT_RMI(CWeapon, SvRequestShoot)
 			if (CGameRules *pGameRules=g_pGame->GetGameRules())
 				pGameRules->ValidateShot(pActor->GetEntityId(), GetEntityId(), params.seq, params.seqr);
 		}
+
+		gServer->GetEvents()->Call("ServerRPC.Callbacks.OnShoot", pActor->GetEntity()->GetScriptTable(), GetEntity()->GetScriptTable(), params.pos, params.hit, params.dir);
 	}
 
 	return true;

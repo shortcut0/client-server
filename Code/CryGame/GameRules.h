@@ -199,7 +199,14 @@ public:
 
 	virtual void SendTextMessage(ETextMessageType type, const char *msg, unsigned int to=eRMI_ToAllClients, int channelId=-1,
 		const char *p0=0, const char *p1=0, const char *p2=0, const char *p3=0);
+
+	// Server (Changed)
+	int m_chatScriptBind_forcedTeam = -1;
+	bool m_chatScriptBind_svChat = false;
+
+
 	virtual void SendChatMessage(EChatMessageType type, EntityId sourceId, EntityId targetId, const char *msg);
+
 	virtual bool CanReceiveChatMessage(EChatMessageType type, EntityId sourceId, EntityId targetId) const;
 
 	virtual void ForbiddenAreaWarning(bool active, int timer, EntityId targetId);
@@ -257,6 +264,10 @@ public:
 	bool IsSameTeam(EntityId firstId, EntityId secondId) const { return GetTeam(firstId) == GetTeam(secondId); };
 	bool IsNeutral(EntityId entityId) const { return GetTeam(entityId) == 0; };
 	bool IsHostile(EntityId firstId, EntityId secondId) const { return (!IsSameTeam(firstId, secondId) || GetTeamCount() < 2); };
+
+	//------------------------------------------------------------------------
+	// Server
+	void InitScriptTables();
 
 	//------------------------------------------------------------------------
 	// player

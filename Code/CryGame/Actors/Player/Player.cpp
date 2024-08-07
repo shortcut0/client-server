@@ -71,6 +71,7 @@ History:
 #include "CryGame/Items/Weapons/Binocular.h"
 #include "CryGame/SoundMoods.h"
 
+
 // enable this to check nan's on position updates... useful for debugging some weird crashes
 #define ENABLE_NAN_CHECK
 

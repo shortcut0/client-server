@@ -1,8 +1,8 @@
 #include <cstring>
 
 #include "Library/WinAPI.h"
-
 #include "MemoryPatch.h"
+
 
 static void FillNop(void* base, std::size_t offset, std::size_t size)
 {
@@ -562,34 +562,178 @@ void MemoryPatch::CrySystem::FixFlashAllocatorUnderflow(void* pCrySystem)
 /**
  * Hooks CryEngine CPU detection.
  */
-void MemoryPatch::CrySystem::HookCPUDetect(void* pCrySystem, void (*handler)(CPUInfo* info))
+
+
+void MemoryPatch::CrySystem::HookCPUDetect(void* pCrySystem, void (*handler)(CPUInfo* info, ISystem* pSystem))
 {
-#ifdef BUILD_64BIT
+
+	// Server (dirty hack because im lazy)
+	int gameBuild = 6156;
+	//...
+
 	unsigned char code[] = {
-		0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // mov rax, 0x0
-		0xFF, 0xE0                                                   // jmp rax
+#ifdef BUILD_64BIT
+		0x48, 0x89, 0x85, 0x28, 0x06, 0x00, 0x00,                    // mov qword ptr ss:[rbp+0x628], rax
+		0x48, 0x8B, 0xC8,                                            // mov rcx, rax
+		0x48, 0x8B, 0xD5,                                            // mov rdx, rbp
+		0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  // mov rax, 0x102030405060708
+		0xFF, 0xD0,                                                  // call rax
+		0x90,                                                        // nop
+		0x90,                                                        // nop
+#else
+		0x89, 0x85, 0x58, 0x05, 0x00, 0x00,                          // mov dword ptr ss:[ebp+0x558], eax
+		0x55,                                                        // push ebp
+		0x50,                                                        // push eax
+		0xB8, 0x00, 0x00, 0x00, 0x00,                                // mov eax, 0x0
+		0xFF, 0xD0,                                                  // call eax
+		0x83, 0xC4, 0x08,                                            // add esp, 0x8
+#endif
+		0x90,                                                        // nop
+		0x90,                                                        // nop
+		0x90,                                                        // nop
+		0x90,                                                        // nop
+		0x90,                                                        // nop
+		0x90,                                                        // nop
+		0x90,                                                        // nop
+		0x90,                                                        // nop
+		0x90,                                                        // nop
+		0x90,                                                        // nop
+		0x90,                                                        // nop
+		0x90,                                                        // nop
+		0x90,                                                        // nop
+		0x90,                                                        // nop
+		0x90,                                                        // nop
+		0x90,                                                        // nop
+		0x90                                                         // nop
 	};
 
-	std::memcpy(&code[2], &handler, 8);
-#else
-	unsigned char code[] = {
-		0x51,                          // push ecx
-		0xB8, 0x00, 0x00, 0x00, 0x00,  // mov eax, 0x0
-		0xFF, 0xD0,                    // call eax
-		0x83, 0xC4, 0x04,              // add esp, 0x4
-		0xC3                           // ret
-	};
-
-	std::memcpy(&code[2], &handler, 4);
-#endif
-
 #ifdef BUILD_64BIT
-	FillMem(pCrySystem, 0xA7E0, &code, sizeof code);
+	std::memcpy(&code[15], &handler, 8);
+
+	// CPUInfo pointer is stored at offset 0x630 instead of 0x628 in Crysis Warhead
+	if (gameBuild == 710 || gameBuild == 711)
+	{
+		code[3] = 0x30;
+	}
 #else
-	FillMem(pCrySystem, 0xA380, &code, sizeof code);
+	std::memcpy(&code[9], &handler, 4);
+
+	// TODO: 32-bit Crysis Warhead
 #endif
+
+	switch (gameBuild)
+	{
+#ifdef BUILD_64BIT
+	case 710:
+	case 711:
+	{
+		FillMem(pCrySystem, 0x45AE0, &code, sizeof(code));
+		break;
+	}
+	case 5767:
+	{
+		FillMem(pCrySystem, 0x45851, &code, sizeof(code));
+		break;
+	}
+	case 5879:
+	{
+		FillMem(pCrySystem, 0x46E21, &code, sizeof(code));
+		break;
+	}
+	case 6115:
+	{
+		FillMem(pCrySystem, 0x462B0, &code, sizeof(code));
+		break;
+	}
+	case 6156:
+	{
+		FillMem(pCrySystem, 0x4636C, &code, sizeof(code));
+		break;
+	}
+	case 6566:
+	{
+		FillMem(pCrySystem, 0x4D3C8, &code, sizeof(code));
+		break;
+	}
+	case 6586:
+	{
+		FillMem(pCrySystem, 0x479CE, &code, sizeof(code));
+		break;
+	}
+	case 6627:
+	{
+		FillMem(pCrySystem, 0x4A51E, &code, sizeof(code));
+		break;
+	}
+	case 6670:
+	case 6729:
+	{
+		code[3] = 0x30;  // 0x630 instead of 0x628
+
+		FillMem(pCrySystem, 0x4A6AE, &code, sizeof(code));
+		break;
+	}
+#else
+	case 687:
+	case 710:
+	case 711:
+	{
+		// TODO: 32-bit Crysis Warhead
+		break;
+	}
+	case 5767:
+	{
+		FillMem(pCrySystem, 0x59CD7, &code, sizeof(code));
+		break;
+	}
+	case 5879:
+	{
+		FillMem(pCrySystem, 0x5A257, &code, sizeof(code));
+		break;
+	}
+	case 6115:
+	{
+		FillMem(pCrySystem, 0x5A037, &code, sizeof(code));
+		break;
+	}
+	case 6156:
+	{
+		FillMem(pCrySystem, 0x59B77, &code, sizeof(code));
+		break;
+	}
+	case 6527:
+	{
+		FillMem(pCrySystem, 0x5A547, &code, sizeof(code));
+		break;
+	}
+	case 6566:
+	{
+		FillMem(pCrySystem, 0x5CFC7, &code, sizeof(code));
+		break;
+	}
+	case 6586:
+	{
+		FillMem(pCrySystem, 0x5A477, &code, sizeof(code));
+		break;
+	}
+	case 6627:
+	{
+		FillMem(pCrySystem, 0x5B407, &code, sizeof(code));
+		break;
+	}
+	case 6670:
+	{
+		FillMem(pCrySystem, 0x5B6F7, &code, sizeof(code));
+		break;
+	}
+	case 6729:
+	{
+		FillMem(pCrySystem, 0x5B707, &code, sizeof(code));
+		break;
+	}
+#endif
+	}
 }
-
 /**
  * Hooks CryEngine fatal error handler.
  */

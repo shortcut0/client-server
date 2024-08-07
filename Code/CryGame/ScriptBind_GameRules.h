@@ -38,6 +38,10 @@ public:
 
 	void AttachTo(CGameRules* pGameRules);
 
+	// Server
+	int InitScriptTables(IFunctionHandler* pH);
+	//...
+
 	int IsServer(IFunctionHandler* pH);
 	int IsClient(IFunctionHandler* pH);
 	int CanCheat(IFunctionHandler* pH);

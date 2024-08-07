@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.15)
 
 ################################################################################
 
-project(CryMP-Client LANGUAGES C CXX RC)
+project(CryMP-ATOM-Server LANGUAGES C CXX RC)
 
 ################################################################################
 
@@ -57,16 +57,16 @@ add_custom_target(GenerateVersion
 	BYPRODUCTS ${PROJECT_BINARY_DIR}/version.h
 )
 
-message(STATUS "Version number: ${CRYMP_CLIENT_VERSION}")
-message(STATUS "Version string: ${CRYMP_CLIENT_VERSION_STRING}")
+message(STATUS "Version number: ${CRYMP_SERVER_VERSION}")
+message(STATUS "Version string: ${CRYMP_SERVER_VERSION_STRING}")
 
 ################################################################################
 
-set(CRYMP_CLIENT_EXE "CryMP-Client${BUILD_BITS}")
+set(CRYMP_SERVER_EXE "CryMP-Server${BUILD_BITS}")
 
-message(STATUS "Target executable: ${CRYMP_CLIENT_EXE}.exe")
+message(STATUS "Target executable: ${CRYMP_SERVER_EXE}.exe")
 
-add_executable(${CRYMP_CLIENT_EXE} WIN32
+add_executable(${CRYMP_SERVER_EXE} WIN32
 	Code/Cry3DEngine/TimeOfDay.cpp
 	Code/Cry3DEngine/TimeOfDay.h
 	Code/CryCommon/Cry3DEngine/CGF/CGFContent.h
@@ -740,7 +740,7 @@ add_executable(${CRYMP_CLIENT_EXE} WIN32
 	ThirdParty/tracy/public/TracyClient.cpp
 	${PROJECT_BINARY_DIR}/config.h
 	${PROJECT_BINARY_DIR}/version.h
-)
+ "Code/CryMP/Server/ServerPublisher.cpp" "Code/CryMP/Server/ServerPublisher.h" "Code/CryMP/Server/ServerLog.h" "Code/CryMP/Server/ServerEvents.h" "Code/CryMP/Server/ServerEvents.cpp" "Code/CryMP/Server/ScriptBind_Server.cpp" "Code/CryMP/Server/ScriptBind_Server.h" "Code/CryMP/Server/LuaFileSystem.cpp" "Code/CryMP/Server/LuaFileSystem.h" "Code/CryMP/Server/ServerUtils.h" "Code/CryMP/Server/ServerCVars.h" "Code/CryMP/Server/ServerCVars.cpp" "Code/CryMP/Server/ServerStats.h" )
 
 ################################################################################
 
@@ -766,12 +766,12 @@ if(CRYMP_USE_MIMALLOC)
 	set_property(TARGET mimalloc PROPERTY C_STANDARD 11)
 	target_include_directories(mimalloc SYSTEM PUBLIC ThirdParty/mimalloc/include)
 
-	target_link_libraries(${CRYMP_CLIENT_EXE} PRIVATE mimalloc)
+	target_link_libraries(${CRYMP_SERVER_EXE} PRIVATE mimalloc)
 endif()
 
 ################################################################################
 
-set(CRYMP_CLIENT_RESOURCES
+set(CRYMP_SERVER_RESOURCES
 	${PROJECT_SOURCE_DIR}/Resources/CursorAmber.cur
 	${PROJECT_SOURCE_DIR}/Resources/CursorBlue.cur
 	${PROJECT_SOURCE_DIR}/Resources/CursorGreen.cur
@@ -787,48 +787,44 @@ set(CRYMP_CLIENT_RESOURCES
 	${PROJECT_SOURCE_DIR}/Resources/Game/Libs/UI/HUD_ChatSystem_HR.gfx
 	${PROJECT_SOURCE_DIR}/Resources/Game/Libs/UI/HUD_KillLog.gfx
 	${PROJECT_SOURCE_DIR}/Resources/Icon.ico
-	${PROJECT_SOURCE_DIR}/Scripts/JSON.lua
-	${PROJECT_SOURCE_DIR}/Scripts/Localization.lua
-	${PROJECT_SOURCE_DIR}/Scripts/Main.lua
-	${PROJECT_SOURCE_DIR}/Scripts/RPC.lua
 	${PROJECT_SOURCE_DIR}/masters.txt
 )
 
-set_source_files_properties(Resources/Launcher.rc PROPERTIES OBJECT_DEPENDS "${CRYMP_CLIENT_RESOURCES}")
+set_source_files_properties(Resources/Launcher.rc PROPERTIES OBJECT_DEPENDS "${CRYMP_SERVER_RESOURCES}")
 
 ################################################################################
 
-set_property(TARGET ${CRYMP_CLIENT_EXE} PROPERTY CXX_STANDARD 20)
-set_property(TARGET ${CRYMP_CLIENT_EXE} PROPERTY CXX_STANDARD_REQUIRED ON)
+set_property(TARGET ${CRYMP_SERVER_EXE} PROPERTY CXX_STANDARD 20)
+set_property(TARGET ${CRYMP_SERVER_EXE} PROPERTY CXX_STANDARD_REQUIRED ON)
 
 if(BUILD_BITS EQUAL 64)
-	target_compile_definitions(${CRYMP_CLIENT_EXE} PUBLIC BUILD_64BIT)
+	target_compile_definitions(${CRYMP_SERVER_EXE} PUBLIC BUILD_64BIT)
 endif()
 
 if(CRYMP_TRACY_ENABLED)
-	target_compile_definitions(${CRYMP_CLIENT_EXE} PRIVATE TRACY_ENABLE)
+	target_compile_definitions(${CRYMP_SERVER_EXE} PRIVATE TRACY_ENABLE)
 endif()
 
 if(CRYMP_CONSOLE_APP)
-	set_target_properties(${CRYMP_CLIENT_EXE} PROPERTIES WIN32_EXECUTABLE FALSE)
+	set_target_properties(${CRYMP_SERVER_EXE} PROPERTIES WIN32_EXECUTABLE FALSE)
 endif()
 
-target_compile_definitions(${CRYMP_CLIENT_EXE} PRIVATE _CRT_SECURE_NO_WARNINGS)
+target_compile_definitions(${CRYMP_SERVER_EXE} PRIVATE _CRT_SECURE_NO_WARNINGS)
 
-target_compile_options(${CRYMP_CLIENT_EXE} PRIVATE /W3)
+target_compile_options(${CRYMP_SERVER_EXE} PRIVATE /W3)
 
-target_include_directories(${CRYMP_CLIENT_EXE} PRIVATE Code ${PROJECT_BINARY_DIR})
-target_include_directories(${CRYMP_CLIENT_EXE} SYSTEM PRIVATE
+target_include_directories(${CRYMP_SERVER_EXE} PRIVATE Code ${PROJECT_BINARY_DIR})
+target_include_directories(${CRYMP_SERVER_EXE} SYSTEM PRIVATE
 	ThirdParty
 	ThirdParty/Lua/src
 	ThirdParty/miniz
 	ThirdParty/tracy/public
 )
 
-target_link_libraries(${CRYMP_CLIENT_EXE} PRIVATE dbghelp ws2_32 winhttp)
+target_link_libraries(${CRYMP_SERVER_EXE} PRIVATE dbghelp ws2_32 winhttp)
 
 # prevent modern MSVC from enabling ASLR and unlock memory above 2 GB
-target_link_options(${CRYMP_CLIENT_EXE} PRIVATE /DYNAMICBASE:NO /LARGEADDRESSAWARE)
+target_link_options(${CRYMP_SERVER_EXE} PRIVATE /DYNAMICBASE:NO /LARGEADDRESSAWARE)
 
 ################################################################################
 

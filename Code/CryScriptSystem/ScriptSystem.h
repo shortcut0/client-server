@@ -114,6 +114,10 @@ public:
 	int GetStackSize() override;
 	uint32_t GetScriptAllocSize() override;
 
+
+	// Server
+	bool m_print_errors = true;
+
 private:
 	void LuaInit();
 	void LuaClose();
@@ -133,3 +137,7 @@ private:
 	static void OnDumpScriptsCmd(IConsoleCmdArgs *pArgs);
 	static void OnGarbageCollectCmd(IConsoleCmdArgs *pArgs);
 };
+
+///////////////////////
+inline ScriptSystem* gScriptSystem;
+///////////////////////

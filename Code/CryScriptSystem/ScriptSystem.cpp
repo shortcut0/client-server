@@ -22,6 +22,9 @@ extern "C"
 #include "ScriptTable.h"
 #include "ScriptUtil.h"
 
+// Server
+#include "CryMP/Server/Server.h"
+
 extern "C"
 {
 	int bitlib_init(lua_State *L);
@@ -929,6 +932,9 @@ uint32_t ScriptSystem::GetScriptAllocSize()
 
 void ScriptSystem::LuaInit()
 {
+	// Server
+	gScriptSystem = this;
+
 	LuaClose();
 
 	m_L = lua_newstate(ScriptSystem::LuaAllocator, this);
@@ -1045,15 +1051,26 @@ bool ScriptSystem::RemoveFromScripts(const char *fileName)
 
 int ScriptSystem::ErrorHandler(lua_State *L)
 {
-	const char *message = lua_tostring(L, 1);
 
-	CryLogErrorAlways("[Script] %s", message);
+
+	const char* message = lua_tostring(L, 1);
+	bool print = gScriptSystem->m_print_errors;
+
+	std::string err_message = message;
+	
+	if (print)
+		CryLogErrorAlways("[Script] %s", message);
 
 	for (const std::string & line : ScriptUtil::GetCallStack(L, 1))
 	{
-		CryLogErrorAlways("    %s", line.c_str());
+		if (print)
+			CryLogErrorAlways("    %s", line.c_str());
+
+		err_message += "\n" +  line;
 	}
 
+	gServer->HandleScriptError(err_message);
+	gScriptSystem->m_print_errors = true;
 	return 0;
 }
 

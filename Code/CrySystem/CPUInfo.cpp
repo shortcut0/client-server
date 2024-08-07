@@ -6,6 +6,9 @@
 #include "CPUInfo.h"
 #include "CryLog.h"
 
+// Server
+#include "Launcher/Launcher.h"
+
 static unsigned int GetCoreCount()
 {
 	unsigned int coreCount = WinAPI::GetLogicalProcessorCount();
@@ -45,8 +48,12 @@ static unsigned int GetFeatures()
 	return features;
 }
 
-void CPUInfo::Detect(CPUInfo* self)
+void CPUInfo::Detect(CPUInfo* self, ISystem* pSystem)
 {
+	// Server
+	gLauncher->OnInit(pSystem);
+
+
 	const unsigned int coreCount = GetCoreCount();
 	const unsigned int features = GetFeatures();
 
@@ -66,4 +73,5 @@ void CPUInfo::Detect(CPUInfo* self)
 		(features & FLAG_SSE)   ? " SSE"    : "",
 		(features & FLAG_SSE2)  ? " SSE2"   : ""
 	);
+
 }

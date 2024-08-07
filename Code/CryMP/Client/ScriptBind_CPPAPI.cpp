@@ -228,11 +228,11 @@ int ScriptBind_CPPAPI::Request(IFunctionHandler *pH, SmartScriptTable params, HS
 		SmartScriptTable headers;
 		int timeout = 4000;
 
-		chain.GetValue("url", url);
-		chain.GetValue("method", method);
-		chain.GetValue("body", body);
-		chain.GetValue("headers", headers);
-		chain.GetValue("timeout", timeout);
+		chain.GetValue("url", url); // 
+		chain.GetValue("method", method); // POS
+		chain.GetValue("body", body); // a=??&b=??
+		chain.GetValue("headers", headers); // Content-Type = application/x-www-form-urlencoded; charset=utf-8
+		chain.GetValue("timeout", timeout); // 30000
 
 		request.url = url;
 		request.method = method;

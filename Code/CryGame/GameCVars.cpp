@@ -933,11 +933,13 @@ void SCVars::ReleaseCVars()
 	pConsole->UnregisterVariable("aim_assistCrosshairSize", true);
 	pConsole->UnregisterVariable("aim_assistCrosshairDebug", true);
 
+	/*
 	pConsole->UnregisterVariable("mp_crymp", true);
 	pConsole->UnregisterVariable("mp_circleJump", true);
 	pConsole->UnregisterVariable("mp_wallJump", true);
 	pConsole->UnregisterVariable("mp_flyMode", true);
 	pConsole->UnregisterVariable("mp_messageCenterColor", true);
+	*/ // Moved to Server
 }
 
 //------------------------------------------------------------------------
