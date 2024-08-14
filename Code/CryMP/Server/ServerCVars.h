@@ -11,6 +11,8 @@ struct ServerCVars {
 	int server_use_hit_queue;
 	int server_use_explosion_queue;
 	int server_classic_chat;
+	int server_lag_resetmovement;
+	int server_ghostbug_fix;
 
 	// Commands
 	ICVar *server_mapTitle;

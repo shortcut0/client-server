@@ -37,6 +37,13 @@ public:
 
 	void AttachTo(CWeapon* pWeapon);
 
+	// Server
+	int SvRemoveAccessory(IFunctionHandler* pH, const char* name);
+	int SvChangeAccessory(IFunctionHandler* pH, const char* name);
+	int GetAttachedAccessories(IFunctionHandler* pH);
+
+	// ...
+
 	int SetAmmoCount(IFunctionHandler* pH);
 	int GetAmmoCount(IFunctionHandler* pH);
 	int GetClipSize(IFunctionHandler* pH);

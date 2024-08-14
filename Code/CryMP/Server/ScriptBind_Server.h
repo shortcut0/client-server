@@ -28,6 +28,8 @@ public:
 	int GetChannelNick(IFunctionHandler* pH, int channelId);
 	int GetChannelIP(IFunctionHandler* pH, int channelId);
 	int GetChannelName(IFunctionHandler* pH, int channelId);
+	int KickChannel(IFunctionHandler* pH, int type, int channelId, const char* reason);
+	int UpdateGameSpyReport(IFunctionHandler* pH, int type, const char* key, const char* val);
 
 	// Server
 	int IsDedicated(IFunctionHandler* pH);
@@ -39,9 +41,17 @@ public:
 	int SetServer(IFunctionHandler* pH, bool mode);
 	int SetClient(IFunctionHandler* pH, bool mode);
 	int SetScriptErrorLog(IFunctionHandler* pH, bool mode);
+	int GetItemCategory(IFunctionHandler* pH, const char* item);
+	int GetLevels(IFunctionHandler* pH);
+	int GetEntityClasses(IFunctionHandler* pH);
+	int GetItemClasses(IFunctionHandler* pH);
+	int IsValidEntityClass(IFunctionHandler* pH, const char* name);
+	int IsValidItemClass(IFunctionHandler* pH, const char* name);
 
 	int GetMemUsage(IFunctionHandler* pH);
 	int GetMemPeak(IFunctionHandler* pH);
 	int GetCPUUsage(IFunctionHandler* pH);
 	int GetCPUName(IFunctionHandler* pH);
+
+	int FSetCVar(IFunctionHandler* pH, const char* cvar, const char* value);
 };

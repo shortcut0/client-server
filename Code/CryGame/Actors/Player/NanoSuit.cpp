@@ -323,6 +323,10 @@ void CNanoSuit::SetParams(SmartScriptTable& rTable, bool resetFirst)
 
 void CNanoSuit::SetInvulnerability(bool invulnerable)
 {
+
+	if (m_pOwner && m_pOwner->m_godMode > 0 && !invulnerable)
+		invulnerable = true;
+
 	m_invulnerable = invulnerable;
 	m_invulnerabilityTimeout = 0.0f;
 	SelectSuitMaterial();
@@ -615,6 +619,12 @@ void CNanoSuit::SetSuitEnergy(float value, bool playerInitiated /* = false */)
 {
 	if (!m_pOwner)
 		return;
+
+	// Server (God Mode)
+	if (value < m_energy) {
+		if (m_pOwner->m_godMode > 0)
+			value = NANOSUIT_ENERGY;
+	} // ...
 
 	value = clamp(value, 0.0f, NANOSUIT_ENERGY);
 	if (m_pOwner && value != m_energy && gEnv->bServer)

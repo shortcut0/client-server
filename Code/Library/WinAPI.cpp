@@ -8,6 +8,94 @@
 #include "StringTools.h"
 
 //////////////////
+// Server Tools //
+//////////////////
+
+#include <Psapi.h>
+
+struct CPUUsageTimes {
+	FILETIME idleTime;
+	FILETIME kernelTime;
+	FILETIME userTime;
+};
+
+CPUUsageTimes Server_m_preTimes;
+CPUUsageTimes Server_m_postTimes;
+
+void GetCPUUsageTimes(CPUUsageTimes& times) {
+	GetSystemTimes(&times.idleTime, &times.kernelTime, &times.userTime);
+}
+
+float ServerStats::UpdateCPU() {
+	GetCPUUsageTimes(Server_m_postTimes);
+
+	ULONGLONG idleDiff = (reinterpret_cast<ULONGLONG&>(Server_m_postTimes.idleTime) - reinterpret_cast<ULONGLONG&>(Server_m_preTimes.idleTime));
+	ULONGLONG kernelDiff = (reinterpret_cast<ULONGLONG&>(Server_m_postTimes.kernelTime) - reinterpret_cast<ULONGLONG&>(Server_m_preTimes.kernelTime));
+	ULONGLONG userDiff = (reinterpret_cast<ULONGLONG&>(Server_m_postTimes.userTime) - reinterpret_cast<ULONGLONG&>(Server_m_preTimes.userTime));
+
+	ULONGLONG totalSystem = kernelDiff + userDiff;
+	ULONGLONG totalTime = totalSystem - idleDiff;
+
+	// Update previous times
+	Server_m_preTimes = Server_m_postTimes;
+
+	if (totalSystem == 0) {
+		return 0.0f;
+	}
+
+	return (static_cast<float>(totalTime) / totalSystem) * 100.0f;
+}
+
+bool ServerStats::Update(float frameTime) {
+
+	if (frameTime >= m_updateTime) {
+		m_cpuUsage = UpdateCPU();
+		m_updateTime += 1.0f;
+		return true;
+	}
+	return false;
+}
+
+std::string ServerStats::GetCPUName() {
+
+	if (!m_cpuName.empty())
+		return m_cpuName;
+	HKEY hKey;
+	if (RegOpenKeyEx(HKEY_LOCAL_MACHINE,
+		"HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0",
+		0, KEY_READ, &hKey) != ERROR_SUCCESS) {
+		return "<Unknown>";
+	}
+	char cpuName[256];
+	DWORD size = sizeof(cpuName);
+	if (RegQueryValueEx(hKey, "ProcessorNameString", nullptr, nullptr,
+		(LPBYTE)cpuName, &size) != ERROR_SUCCESS) {
+		RegCloseKey(hKey);
+		return "<Unknown>";
+	}
+	RegCloseKey(hKey);
+	m_cpuName = cpuName;
+	return std::string(cpuName);
+}
+
+float ServerStats::GetMemUsage() {
+	PROCESS_MEMORY_COUNTERS pmc;
+	if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc))) {
+		return float(pmc.WorkingSetSize);}
+	else {}
+	return 0.f;
+}
+
+float ServerStats::GetMemPeak() {
+	PROCESS_MEMORY_COUNTERS pmc;
+	if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc))) {
+		return float(pmc.PeakWorkingSetSize);}
+	else {}
+
+	return 0.f;
+}
+
+//////////////////
 // Command line //
 //////////////////
 
@@ -167,7 +255,10 @@ void WinAPI::DLL::Unload(void* pDLL)
 
 void WinAPI::ErrorBox(const char *message)
 {
-	MessageBoxA(nullptr, message, "Error", MB_OK | MB_ICONERROR);
+	printf(message);
+
+	if (!WinAPI::CmdLine::HasArg("-headless"))
+		MessageBoxA(nullptr, message, "Error", MB_OK | MB_ICONERROR);
 }
 
 ///////////////

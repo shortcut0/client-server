@@ -12,9 +12,8 @@
 *************************************************************************/
 #include <cstring>
 
-#include "CryCommon/CrySystem/ISystem.h"
-#include "CryCommon/CrySystem/IConsole.h"
 #include "ServerCVars.h"
+#include "ServerCVarCallbacks.h"
 
 ServerCVars::ServerCVars()
 {
@@ -29,14 +28,40 @@ ServerCVars::~ServerCVars()
 void ServerCVars::InitCVars(IConsole* pConsole)
 {
 	
+	// ---------------------------------------------------------
+	// Callbacks
+
+
+	// ----------------
+	if (ICVar* pMaxPlayers = pConsole->GetCVar("sv_maxPlayers"))
+		pMaxPlayers->SetOnChangeCallback(CCALLBACK_MaxPlayers);
+
+
+	// ----------------
+	if (ICVar* pServerName = pConsole->GetCVar("sv_serverName"))
+		pServerName->SetOnChangeCallback(CCALLBACK_ServerName);
+
+
+	// ---------------- doesnt work!!
+	//if (ICVar* pMapCommand = pConsole->GetCVar("map"))
+	//	pMapCommand->SetOnChangeCallback(CCALLBACK_Map);
+
+	// ...
+	// ---------------------------------------------------------
+	
+
 	// Flags
 	const int OPTIONAL_SYNC = 0;
 
 	// ---------------
 	// Server CVars 
+	pConsole->Register("server_ghostbug_fix", &server_ghostbug_fix, 1, 0, "Enable/Disable the ghost bug fix");
 	pConsole->Register("server_use_hit_queue", &server_use_hit_queue, 0, 0, "Enable/Disable the hit queue");
 	pConsole->Register("server_use_explosion_queue", &server_use_explosion_queue, 1, 0, "Enable/Disable the explosion queue");
 	pConsole->Register("server_classic_chat", &server_classic_chat, 0, 0, "Enable/Disable the default chat system");
+
+	// Lag Fix
+	pConsole->Register("server_lag_resetmovement", &server_lag_resetmovement, 0, 0, "Enables/Disables Resetting movement on network lag");
 	
 	// ---------------
 	// Commands

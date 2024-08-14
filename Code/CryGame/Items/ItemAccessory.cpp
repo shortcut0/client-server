@@ -17,6 +17,94 @@ History:
 #include "CryGame/Game.h"
 #include "CryGame/HUD/HUD.h"
 
+//------------------------------------------------------------------------
+// Server
+void CItem::SvChangeAccessory(const ItemString& name)
+{
+	SvSwitchAccessory(name);
+	GetGameObject()->InvokeRMI(ClAttachAccessory(), RequestAttachAccessoryParams(name.c_str()), eRMI_ToAllClients | eRMI_NoLocalCalls);
+}
+
+//------------------------------------------------------------------------
+// Server
+void CItem::SvRemoveAccessory(const ItemString& name)
+{
+	if (SvDetachAccessory(name))
+		return;
+}
+
+//------------------------------------------------------------------------
+// Server
+bool CItem::SvDetachAccessory(const ItemString& inAccessory)
+{
+	
+	const ItemString& accessory = (inAccessory == g_pItemStrings->SCARSleepAmmo) ? g_pItemStrings->SCARTagAmmo : inAccessory;
+
+	SAccessoryParams* params = GetAccessoryParams(accessory);
+
+	bool removed = true;
+	for (TAccessoryMap::iterator it = m_accessories.begin(); it != m_accessories.end(); it++)
+	{
+		SAccessoryParams* p = GetAccessoryParams(it->first);
+
+		//CryLogAlways("check: %s", it->first.c_str());
+
+		if (strcmp(inAccessory.c_str(), "all") == 0) {
+			//CryLogAlways("remove->all (%s)", it->first.c_str());
+			AttachAccessory(ItemString(it->first.c_str()), false, true, true);
+			GetGameObject()->InvokeRMI(ClAttachAccessory(), RequestAttachAccessoryParams(it->first.c_str()), eRMI_ToAllClients | eRMI_NoLocalCalls);
+		}
+		else {
+			if (strcmp(it->first.c_str(), inAccessory.c_str()) == 0)
+			{
+				//CryLogAlways("detach this %s", inAccessory.c_str());
+				AttachAccessory(inAccessory, false, true, true);
+				GetGameObject()->InvokeRMI(ClAttachAccessory(), RequestAttachAccessoryParams(inAccessory.c_str()), eRMI_ToAllClients | eRMI_NoLocalCalls);
+			}
+		}
+	}
+	return removed;
+}
+
+//------------------------------------------------------------------------
+// Server
+void CItem::SvSwitchAccessory(const ItemString& inAccessory)
+{
+	const ItemString& accessory = (inAccessory == g_pItemStrings->SCARSleepAmmo) ? g_pItemStrings->SCARTagAmmo : inAccessory;
+
+	SAccessoryParams* params = GetAccessoryParams(accessory);
+	bool attached = false;
+	if (params)
+	{
+		ItemString replacing;
+		bool exclusive = false;
+		for (TAccessoryMap::iterator it = m_accessories.begin(); it != m_accessories.end(); it++)
+		{
+			SAccessoryParams* p = GetAccessoryParams(it->first);
+
+			if (p && p->attach_helper == params->attach_helper)
+			{
+				replacing = it->first;
+				attached = true;
+				exclusive = p->exclusive;
+			}
+		}
+		if (attached)
+		{
+			AttachAccessory(replacing, false, true, true);
+			CryLogAlways("replacing %s OFF", replacing.c_str());
+			if (accessory != replacing) {
+				AttachAccessory(accessory, true, true, true);
+				CryLogAlways("putting %s ON", accessory.c_str());
+			}
+		}
+	}
+
+	if (!attached) {
+		AttachAccessory(accessory, true, true, true);
+		CryLogAlways("[nothing else] putting %s ON", accessory.c_str());
+	}
+}
 
 //------------------------------------------------------------------------
 CItem* CItem::AddAccessory(const ItemString& name)

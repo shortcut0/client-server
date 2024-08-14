@@ -77,6 +77,11 @@ namespace MemoryPatch
 		void HookAdapterInfo(void* pCryRenderD3D10, void (*handler)(AdapterInfo* info));
 	}
 
+	namespace CryRenderNULL
+	{
+		void DisableDebugRenderer(void* pCryRenderNULL, int gameBuild);
+	}
+
 	namespace CrySystem
 	{
 		void AllowDX9VeryHighSpec(void* pCrySystem);

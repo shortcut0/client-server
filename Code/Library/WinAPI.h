@@ -10,6 +10,34 @@
 #include <functional>
 #include <map>
 
+
+//////////////////////////
+// Server Stats
+//////////////////////////
+
+class ServerStats
+{
+public:
+	std::string m_cpuName;
+	float m_updateTime = 0.0f;
+	float m_cpuUsage = 0.0f;
+	// --------------
+	bool Update(float frameTime);
+	// ------------------------------------------------
+	// CPU
+	std::string GetCPUName();
+	float UpdateCPU();
+	float GetCPUUsage() {return m_cpuUsage;}
+	// ------------------------------------------------
+	// MEMORY
+	float GetMemUsage();
+	float GetMemPeak();
+	// ------------------------------------------------
+};
+
+//////////////////////////
+
+
 namespace WinAPI
 {
 	inline constexpr std::string_view NEWLINE = "\r\n";

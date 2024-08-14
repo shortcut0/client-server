@@ -15,6 +15,9 @@ History:
 #include "ItemSharedParams.h"
 #include "CryGame/Actors/Actor.h"
 
+// Server
+#include "CryMP/Server/Server.h"
+
 
 //------------------------------------------------------------------------
 EntityId CItem::NetGetOwnerId() const
@@ -86,8 +89,21 @@ IMPLEMENT_RMI(CItem, SvRequestAttachAccessory)
 	{
 		if (pInventory->GetCountOfClass(params.accessory.c_str()) > 0)
 		{
+			// Server Callback
+			bool bOk = true;
+			IScriptTable* pOwnerSS;
+			if (IEntity* pOwner = GetOwner())
+				pOwnerSS = pOwner->GetScriptTable();
+
+			gServer->GetEvents()->Get("ServerRPC.Callbacks.OnSwitchAccessory", bOk, GetEntity()->GetScriptTable(), pOwnerSS, params.accessory.c_str());
+			if (!bOk)
+				return false;
+			// ...
+
+
 			DoSwitchAccessory(ItemString(params.accessory.c_str()));
 			GetGameObject()->InvokeRMI(ClAttachAccessory(), params, eRMI_ToAllClients | eRMI_NoLocalCalls);
+
 
 			return true;
 		}
@@ -115,8 +131,19 @@ IMPLEMENT_RMI(CItem, SvRequestEnterModify)
 //------------------------------------------------------------------------
 IMPLEMENT_RMI(CItem, SvRequestLeaveModify)
 {
-	GetGameObject()->InvokeRMI(ClLeaveModify(), params, eRMI_ToOtherClients, m_pGameFramework->GetGameChannelId(pNetChannel));
 
+	// Server
+	bool bOk = true;
+	IScriptTable* pOwnerSS;
+	if (IEntity* pOwner = GetOwner())
+		pOwnerSS = pOwner->GetScriptTable();
+
+	gServer->GetEvents()->Get("ServerRPC.Callbacks.OnLeaveWeaponModify", bOk, GetEntity()->GetScriptTable(), pOwnerSS);
+	if (!bOk)
+		return false;
+	// ...
+
+	GetGameObject()->InvokeRMI(ClLeaveModify(), params, eRMI_ToOtherClients, m_pGameFramework->GetGameChannelId(pNetChannel));
 	return true;
 }
 

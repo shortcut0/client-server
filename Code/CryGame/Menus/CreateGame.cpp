@@ -168,6 +168,8 @@ void CMultiPlayerMenu::SCreateGame::StartServer()
 		rotation->SetRandom(true);
 	IConsole* pConsole = gEnv->pConsole;
 
+	
+
 	if (ICVar* var = pConsole->GetCVar("sv_servername"))
 		var->Set(m_name.c_str());
 

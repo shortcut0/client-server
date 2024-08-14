@@ -10,6 +10,8 @@
 #include <vector>
 #include <filesystem>
 
+#include "Library/WinAPI.h"
+
 // Listeners
 #include "CryCommon/CryAction/IGameFramework.h"
 #include "CryCommon/CryAction/ILevelSystem.h"
@@ -34,12 +36,20 @@
 class Executor;
 class HTTPClient;
 
+enum class EGameSpyUpdateType {
+	eGSUpdate_Server = 0,
+	eGSUpdate_Player,
+	eGSUpdate_Team
+};
 //ServerPublisher *gServerPbl;
 
 
 // ---------------------------------
 class Server : public IGameFrameworkListener, public ILevelSystemListener, public IEntitySystemSink
 {
+	// ------------------------------
+	static void m_pExitHandler();;
+
 	// ------------------------------
 	IGameFramework* m_pGameFramework = nullptr;
 	INetworkService* m_pGSMaster = nullptr;
@@ -55,6 +65,11 @@ class Server : public IGameFrameworkListener, public ILevelSystemListener, publi
 	std::unique_ptr<ServerStats> m_pServerStats;
 
 	// ------------------------------
+
+	std::vector<std::pair<EntityId, float>> m_scheduledEntityRemovals;
+	void UpdateEntityRemoval();
+	//void ScheduleEntityRemoval();
+
 	std::vector<std::string> m_masters;
 
 	std::filesystem::path m_rootDir;
@@ -70,18 +85,27 @@ class Server : public IGameFrameworkListener, public ILevelSystemListener, publi
 
 	// ------------------------------
 
-	IScriptSystem* m_pSS;
+	void InitGameOverwrites(const std::string& filename);
+	std::vector<std::pair<std::string, std::string>> m_pOverwriteSF;
+
+	// ------------------------------
+
+	IScriptSystem* m_pSS = nullptr;
 	std::string m_serverScriptPath;
 	SmartScriptTable m_ATOMLua;
 	SmartScriptTable m_ServerRPCLua;
 	SmartScriptTable m_ServerRPCCallbackLua;
-	bool m_ATOMLuaInitialized;
+	bool m_ATOMLuaInitialized = false;
 
 public:
 
 	// ------------------------------
 	Server();
 	~Server();
+
+	// ---------------------------------
+	// Overwrites input script path 
+	bool OverwriteScriptPath(std::string &output, const std::string& input);
 
 	// ---------------------------------
 	void Log(const char* format, ...); //
@@ -172,7 +196,17 @@ public:
 	bool IsLuaReady() const
 	{
 		bool error = false;
-		m_pSS->GetGlobalValue("SCRIPT_ERROR", error);
+		if (m_pSS)
+			m_pSS->GetGlobalValue("SCRIPT_ERROR", error);
+
+		if (!m_ServerRPCCallbackLua)
+			return false;
+
+		if (!m_ServerRPCLua)
+			return false;
+
+			if (!m_ATOMLua)
+				return false;
 
 		return !error && m_ATOMLuaInitialized;
 	}
@@ -187,7 +221,15 @@ public:
 		return m_workingDir.string();
 	}
 
-	bool m_bErrorHandledFrame;
+	INetworkService *GetGSMaster() const
+	{
+		return m_pGSMaster;
+	}
+
+	bool UpdateGameSpyServerReport(EGameSpyUpdateType type, const char* key, const char* value, int index = 0);
+
+
+	bool m_bErrorHandledFrame = false;
 	void HandleScriptError(const std::string &error);
 	
 
@@ -213,16 +255,16 @@ private:
 	void OnEvent(IEntity* pEntity, SEntityEvent& event) override;
 
 	//
-	bool ReadCfg(std::string filepath);
+	bool ReadCfg(const std::string &filepath);
 	
 	//
-	bool m_Initialized;
-	float m_tickCounter;
-	float m_tickGoal;
-	float m_minGoal;
-	float m_hourGoal;
+	bool m_Initialized = false;
+	float m_tickCounter = 0;
+	float m_tickGoal = 0;
+	float m_minGoal = 0;
+	float m_hourGoal = 0;
 
-	int m_lastChannel;
+	int m_lastChannel = 0;
 };
 
 ///////////////////////

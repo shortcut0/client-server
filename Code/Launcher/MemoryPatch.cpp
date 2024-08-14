@@ -4,6 +4,11 @@
 #include "MemoryPatch.h"
 
 
+static void* ByteOffset(void* base, std::size_t offset)
+{
+	return static_cast<unsigned char*>(base) + offset;
+}
+
 static void FillNop(void* base, std::size_t offset, std::size_t size)
 {
 	void* address = static_cast<unsigned char*>(base) + offset;
@@ -878,4 +883,223 @@ void MemoryPatch::CryAction::DisableTimeOfDayLengthLowerLimit(void* pCryAction)
 #else
 	FillNop(pCryAction, 0x20C9E4, 0x23);
 #endif
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// CryRenderNULL
+////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Disables the debug renderer in CryRenderNULL DLL.
+ *
+ * This patch gets rid of the wasteful debug renderer with its hidden window and OpenGL context.
+ *
+ * The 1st FillNop disables debug renderer stuff in CNULLRenderAuxGeom constructor.
+ * The 2nd FillNop disables debug renderer stuff in CNULLRenderAuxGeom destructor.
+ * The 3rd FillMem disables the CNULLRenderAuxGeom::BeginFrame call in CNULLRenderer::BeginFrame.
+ * The 4th FillMem disables the CNULLRenderAuxGeom::EndFrame call in CNULLRenderer::EndFrame.
+ */
+void MemoryPatch::CryRenderNULL::DisableDebugRenderer(void* pCryRenderNULL, int gameBuild)
+{
+	const unsigned char code[] = {
+		0xC3,  // ret
+#ifdef BUILD_64BIT
+		0x90,  // nop
+#endif
+		0x90,  // nop
+		0x90,  // nop
+		0x90,  // nop
+		0x90,  // nop
+		0x90   // nop
+	};
+
+	unsigned int renderAuxGeomVTableOffset = 0;
+
+	switch (gameBuild)
+	{
+	case 687:
+	case 710:
+	case 711:
+	{
+		// Crysis Warhead has no CryRenderNULL DLL
+		break;
+	}
+#ifdef BUILD_64BIT
+	case 5767:
+	{
+		FillNop(pCryRenderNULL, 0xD2B9, 0x175);
+		FillNop(pCryRenderNULL, 0xD473, 0x35);
+		FillMem(pCryRenderNULL, 0x16BE, code, sizeof(code));
+		FillMem(pCryRenderNULL, 0x16D0, code, sizeof(code));
+		renderAuxGeomVTableOffset = 0x97578;
+		break;
+	}
+	case 5879:
+	{
+		FillNop(pCryRenderNULL, 0xD489, 0x175);
+		FillNop(pCryRenderNULL, 0xD393, 0x35);
+		FillMem(pCryRenderNULL, 0x16CE, code, sizeof(code));
+		FillMem(pCryRenderNULL, 0x16E0, code, sizeof(code));
+		renderAuxGeomVTableOffset = 0x97538;
+		break;
+	}
+	case 6115:
+	{
+		FillNop(pCryRenderNULL, 0xD049, 0x175);
+		FillNop(pCryRenderNULL, 0xD203, 0x35);
+		FillMem(pCryRenderNULL, 0x16BE, code, sizeof(code));
+		FillMem(pCryRenderNULL, 0x16D0, code, sizeof(code));
+		renderAuxGeomVTableOffset = 0x974A8;
+		break;
+	}
+	case 6156:
+	{
+		FillNop(pCryRenderNULL, 0xD379, 0x175);
+		FillNop(pCryRenderNULL, 0xD533, 0x35);
+		FillMem(pCryRenderNULL, 0x16CE, code, sizeof(code));
+		FillMem(pCryRenderNULL, 0x16E0, code, sizeof(code));
+		renderAuxGeomVTableOffset = 0x97588;
+		break;
+	}
+	case 6566:
+	{
+		FillNop(pCryRenderNULL, 0xC332, 0x175);
+		FillNop(pCryRenderNULL, 0xC4EC, 0x35);
+		FillMem(pCryRenderNULL, 0x176E, code, sizeof(code));
+		FillMem(pCryRenderNULL, 0x1780, code, sizeof(code));
+		renderAuxGeomVTableOffset = 0x98918;
+		break;
+	}
+	case 6586:
+	{
+		FillNop(pCryRenderNULL, 0xCFC9, 0x175);
+		FillNop(pCryRenderNULL, 0xD183, 0x35);
+		FillMem(pCryRenderNULL, 0x16FE, code, sizeof(code));
+		FillMem(pCryRenderNULL, 0x1710, code, sizeof(code));
+		renderAuxGeomVTableOffset = 0x984B8;
+		break;
+	}
+	case 6627:
+	{
+		FillNop(pCryRenderNULL, 0xD369, 0x175);
+		FillNop(pCryRenderNULL, 0xD523, 0x35);
+		FillMem(pCryRenderNULL, 0x16FE, code, sizeof(code));
+		FillMem(pCryRenderNULL, 0x1710, code, sizeof(code));
+		renderAuxGeomVTableOffset = 0x984B8;
+		break;
+	}
+	case 6670:
+	case 6729:
+	{
+		FillNop(pCryRenderNULL, 0xD0D9, 0x175);
+		FillNop(pCryRenderNULL, 0xD293, 0x35);
+		FillMem(pCryRenderNULL, 0x16FE, code, sizeof(code));
+		FillMem(pCryRenderNULL, 0x1710, code, sizeof(code));
+		renderAuxGeomVTableOffset = 0x984B8;
+		break;
+	}
+#else
+	case 5767:
+	{
+		FillNop(pCryRenderNULL, 0x1CF3E, 0x101);
+		FillNop(pCryRenderNULL, 0x1D051, 0xE);
+		FillMem(pCryRenderNULL, 0x1895, code, sizeof(code));
+		FillMem(pCryRenderNULL, 0x18A9, code, sizeof(code));
+		renderAuxGeomVTableOffset = 0xA677C;
+		break;
+	}
+	case 5879:
+	{
+		FillNop(pCryRenderNULL, 0x1CF78, 0x101);
+		FillNop(pCryRenderNULL, 0x1CEFE, 0xE);
+		FillMem(pCryRenderNULL, 0x1895, code, sizeof(code));
+		FillMem(pCryRenderNULL, 0x18A9, code, sizeof(code));
+		renderAuxGeomVTableOffset = 0xA6734;
+		break;
+	}
+	case 6115:
+	{
+		FillNop(pCryRenderNULL, 0x1CF4F, 0x101);
+		FillNop(pCryRenderNULL, 0x1D062, 0xE);
+		FillMem(pCryRenderNULL, 0x1895, code, sizeof(code));
+		FillMem(pCryRenderNULL, 0x18A9, code, sizeof(code));
+		renderAuxGeomVTableOffset = 0xA6784;
+		break;
+	}
+	case 6156:
+	{
+		FillNop(pCryRenderNULL, 0x1CEE6, 0x101);
+		FillNop(pCryRenderNULL, 0x1CFF9, 0xE);
+		FillMem(pCryRenderNULL, 0x1895, code, sizeof(code));
+		FillMem(pCryRenderNULL, 0x18A9, code, sizeof(code));
+		renderAuxGeomVTableOffset = 0xA778C;
+		break;
+	}
+	case 6527:
+	{
+		FillNop(pCryRenderNULL, 0x1CE41, 0x101);
+		FillNop(pCryRenderNULL, 0x1CF54, 0xE);
+		FillMem(pCryRenderNULL, 0x189B, code, sizeof(code));
+		FillMem(pCryRenderNULL, 0x18AF, code, sizeof(code));
+		renderAuxGeomVTableOffset = 0xA779C;
+		break;
+	}
+	case 6566:
+	{
+		FillNop(pCryRenderNULL, 0x1D3D9, 0x10C);
+		FillNop(pCryRenderNULL, 0x1D4F7, 0xE);
+		FillMem(pCryRenderNULL, 0x18A0, code, sizeof(code));
+		FillMem(pCryRenderNULL, 0x18B4, code, sizeof(code));
+		renderAuxGeomVTableOffset = 0xB078C;
+		break;
+	}
+	case 6586:
+	{
+		FillNop(pCryRenderNULL, 0x1CF67, 0x101);
+		FillNop(pCryRenderNULL, 0x1D07A, 0xE);
+		FillMem(pCryRenderNULL, 0x18A0, code, sizeof(code));
+		FillMem(pCryRenderNULL, 0x18B4, code, sizeof(code));
+		renderAuxGeomVTableOffset = 0xA779C;
+		break;
+	}
+	case 6627:
+	case 6670:
+	case 6729:
+	{
+		FillNop(pCryRenderNULL, 0x1CF7C, 0x101);
+		FillNop(pCryRenderNULL, 0x1D08F, 0xE);
+		FillMem(pCryRenderNULL, 0x18AD, code, sizeof(code));
+		FillMem(pCryRenderNULL, 0x18C1, code, sizeof(code));
+		renderAuxGeomVTableOffset = 0xA779C;
+		break;
+	}
+#endif
+	}
+
+	if (renderAuxGeomVTableOffset)
+	{
+		void** oldVTable = static_cast<void**>(ByteOffset(pCryRenderNULL, renderAuxGeomVTableOffset));
+
+		// CNULLRenderAuxGeom::SetRenderFlags is empty and returns nothing
+		void* emptyFunc = oldVTable[0];
+
+		// create a new CNULLRenderAuxGeom vtable
+		void* newVTable[27] = {};
+
+		// keep CNULLRenderAuxGeom::SetRenderFlags
+		// keep CNULLRenderAuxGeom::GetRenderFlags
+		newVTable[0] = oldVTable[0];
+		newVTable[1] = oldVTable[1];
+
+		// make the rest of CNULLRenderAuxGeom functions empty
+		// note that all the functions return nothing
+		for (int i = 2; i < 27; i++)
+		{
+			newVTable[i] = emptyFunc;
+		}
+
+		// install the new vtable
+		FillMem(pCryRenderNULL, renderAuxGeomVTableOffset, newVTable, sizeof(newVTable));
+	}
 }

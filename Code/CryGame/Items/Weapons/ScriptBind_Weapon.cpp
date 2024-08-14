@@ -605,16 +605,70 @@ void CScriptBind_Weapon::RegisterMethods()
 	SCRIPT_REG_TEMPLFUNC(SwitchAccessory, "accessoryName");
 
 	SCRIPT_REG_TEMPLFUNC(IsFiring, "");
-
 	SCRIPT_REG_TEMPLFUNC(SetCurrentFireMode, "name")
-		SCRIPT_REG_TEMPLFUNC(SetCurrentZoomMode, "name")
-
-		SCRIPT_REG_TEMPLFUNC(AutoShoot, "nshots, autoReload");
-
+	SCRIPT_REG_TEMPLFUNC(SetCurrentZoomMode, "name")
+	SCRIPT_REG_TEMPLFUNC(AutoShoot, "nshots, autoReload");
 	SCRIPT_REG_TEMPLFUNC(Reload, "")
 
-		SCRIPT_REG_TEMPLFUNC(ActivateLamLaser, "activate");
+	SCRIPT_REG_TEMPLFUNC(ActivateLamLaser, "activate");
 	SCRIPT_REG_TEMPLFUNC(ActivateLamLight, "activate");
+
+	// Server
+	SCRIPT_REG_TEMPLFUNC(SvRemoveAccessory, "name");
+	SCRIPT_REG_TEMPLFUNC(SvChangeAccessory, "name");
+	SCRIPT_REG_FUNC(GetAttachedAccessories);
+}
+
+//------------------------------------------------------------------------
+// Server
+int CScriptBind_Weapon::GetAttachedAccessories(IFunctionHandler* pH)
+{
+	CWeapon* pWeapon = GetWeapon(pH);
+	if (!pWeapon)
+		return pH->EndFunction();
+
+	const CItem::TAccessoryMap* pMap = pWeapon->GetAttachedAccessories();
+	SmartScriptTable pAttached(gEnv->pScriptSystem->CreateTable());
+
+	bool getClass = false;
+	if (pH->GetParamCount() >= 1)
+		pH->GetParam(1, getClass);
+
+	for (CItem::TAccessoryMap::const_iterator it = pMap->begin(); it != pMap->end(); it++) {
+		if (getClass)
+			pAttached->PushBack(it->first.c_str());
+		else
+			pAttached->PushBack(ScriptHandle(it->second));
+	}
+
+	return pH->EndFunction(pAttached);
+}
+
+//------------------------------------------------------------------------
+// Server
+int CScriptBind_Weapon::SvRemoveAccessory(IFunctionHandler* pH, const char* name)
+{
+	CWeapon* pWeapon = GetWeapon(pH);
+	if (!pWeapon)
+		return pH->EndFunction();
+
+	pWeapon->SvRemoveAccessory(ItemString(name));
+
+	return pH->EndFunction();
+}
+
+
+//------------------------------------------------------------------------
+// Server
+int CScriptBind_Weapon::SvChangeAccessory(IFunctionHandler* pH, const char* name)
+{
+	CWeapon* pWeapon = GetWeapon(pH);
+	if (!pWeapon)
+		return pH->EndFunction();
+
+	pWeapon->SvChangeAccessory(ItemString(name));
+
+	return pH->EndFunction();
 }
 
 //------------------------------------------------------------------------

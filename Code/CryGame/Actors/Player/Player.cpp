@@ -72,6 +72,9 @@ History:
 #include "CryGame/SoundMoods.h"
 
 
+// Server
+#include "CryMP/Server/Server.h"
+
 // enable this to check nan's on position updates... useful for debugging some weird crashes
 #define ENABLE_NAN_CHECK
 
@@ -733,16 +736,19 @@ void CPlayer::Update(SEntityUpdateContext& ctx, int updateSlot)
 	if (pEnt->IsHidden() && !(GetEntity()->GetFlags() & ENTITY_FLAG_UPDATE_HIDDEN))
 		return;
 
-	if (gEnv->bServer && !IsClient() && IsPlayer())
+	if (g_pServerCVars->server_lag_resetmovement > 0)
 	{
-		if (INetChannel* pNetChannel = m_pGameFramework->GetNetChannel(GetChannelId()))
+		if (gEnv->bServer && !IsClient() && IsPlayer())
 		{
-			if (pNetChannel->GetContextViewState() >= eCVS_InGame)
+			if (INetChannel* pNetChannel = m_pGameFramework->GetNetChannel(GetChannelId()))
 			{
-				if (pNetChannel->IsSufferingHighLatency(gEnv->pTimer->GetAsyncTime()))
-					SufferingHighLatency(true);
-				else
-					SufferingHighLatency(false);
+				if (pNetChannel->GetContextViewState() >= eCVS_InGame)
+				{
+					if (pNetChannel->IsSufferingHighLatency(gEnv->pTimer->GetAsyncTime()))
+						SufferingHighLatency(true);
+					else
+						SufferingHighLatency(false);
+				}
 			}
 		}
 	}
@@ -1562,12 +1568,15 @@ void CPlayer::PrePhysicsUpdate()
 		}
 		else
 		{
-			//CryMP: Ghost Bug Fix 10.05.2022
-			if (IsPlayer() && GetPhysicsProfile() == eAP_Alive)
-			{
-				if (IPhysicalEntity* pPhysics = GetEntity()->GetPhysics())
+
+			if (!gEnv->bServer || g_pServerCVars->server_ghostbug_fix > 0) {
+				//CryMP: Ghost Bug Fix 10.05.2022
+				if (IsPlayer() && GetPhysicsProfile() == eAP_Alive)
 				{
-					pCharacter->GetISkeletonPose()->SynchronizeWithPhysicalEntity(pPhysics);
+					if (IPhysicalEntity* pPhysics = GetEntity()->GetPhysics())
+					{
+						pCharacter->GetISkeletonPose()->SynchronizeWithPhysicalEntity(pPhysics);
+					}
 				}
 			}
 		}

@@ -31,12 +31,15 @@
 #include <fstream>
 #include <string>
 
+// Exit handler
+#include <cstdlib>  // For std::atexit
 
 // ----------
 ServerCVars* g_pServerCVars = 0;
 
 // -------------------------------------
-Server::Server()
+Server::Server() :
+	m_Initialized(false)
 {
 }
 
@@ -46,8 +49,28 @@ Server::~Server()
 }
 
 // -------------------------------------
+void Server::m_pExitHandler() {
+
+	gServer->Log("Exiting...");
+
+	if (gServer->m_pSS && gServer->IsLuaReady()) {
+		gServer->Log("Trying to inform LUA...");
+		if (ServerEvents* pEvents = gServer->GetEvents()) {
+			gServer->Log("Calling lua...");
+			pEvents->Call("ServerRPC.Callbacks.OnGameQuit");
+		}
+	}
+}
+
+// -------------------------------------
 void Server::Init(IGameFramework* pGameFramework)
 {
+	
+	// --------------------------------------
+	Log("Setting atexit callback..");
+	std::atexit(m_pExitHandler);
+
+	// --------------------------------------
 	IConsole* pConsole = gEnv->pConsole;
 	IScriptSystem* pScriptSystem = gEnv->pScriptSystem;
 	IEntitySystem* pEntitySystem = gEnv->pEntitySystem;
@@ -105,12 +128,28 @@ void Server::Init(IGameFramework* pGameFramework)
 	m_hourGoal = 3600.f;
 
 	m_lastChannel = 1;
+
+
+	// --------------------------------
+	// OVERWRITE GAME SCRIPT FILES
+
+	std::string overwriteFile = m_rootDir.string() + "/Scripts/GameOverwrites.txt";
+	InitGameOverwrites(overwriteFile);
+
+	// test!!
+	//m_pOverwriteSF.push_back(std::make_pair("scripts/gamerules/powerstruggle.lua", std::string("../" + m_rootDir.filename().string() + "/Scripts/Game/GameRules/powerstruggle.lua")));
+	// --------------------------------
 }
 
 // -------------------------------------
 void Server::UpdateLoop()
 {
-	ReadCfg(std::string("ATOM - 2024\\Config\\ATOM.cfg"));
+
+	std::string cfg ("CryMP-Server\\Config\\Init.cfg");
+	if (WinAPI::CmdLine::HasArg("-dedicated"))
+		cfg = "CryMP-Server\\Config\\Init-Headless.cfg";
+
+	ReadCfg(cfg);
 
 	const bool haveFocus = true;
 	const unsigned int updateFlags = 0;
@@ -130,21 +169,29 @@ void Server::UpdateLoop()
 			if (IsLuaReady()) {
 
 				m_tickCounter += gEnv->pTimer->GetFrameTime();
-				Script::CallMethod(m_ServerRPCCallbackLua, "OnUpdate");
+				GetStats()->Update(m_tickCounter);
 
-				if (m_tickCounter >= m_tickGoal) {
-					Script::CallMethod(m_ServerRPCCallbackLua, "OnTimer", 1);
-					m_tickGoal += (1.0f);
-				}
+				//if (GetStats()->Update(m_tickCounter))
+				//	CryLogAlways("%02.2f - %f, %f - %s", GetStats()->GetCPUUsage(), GetStats()->GetMemUsage(), GetStats()->GetMemPeak(), GetStats()->GetCPUName().c_str());
 
-				if (m_tickCounter >= m_minGoal) {
-					Script::CallMethod(m_ServerRPCCallbackLua, "OnTimer", 2);
-					m_minGoal += (60.0f);
-				}
+				if (m_ServerRPCCallbackLua) {
 
-				if (m_tickCounter >= m_hourGoal) {
-					Script::CallMethod(m_ServerRPCCallbackLua, "OnTimer", 3);
-					m_hourGoal += (3600.f);
+					Script::CallMethod(m_ServerRPCCallbackLua, "OnUpdate");
+
+					if (m_tickCounter >= m_tickGoal) {
+						Script::CallMethod(m_ServerRPCCallbackLua, "OnTimer", 1);
+						m_tickGoal += (1.0f);
+					}
+
+					if (m_tickCounter >= m_minGoal) {
+						Script::CallMethod(m_ServerRPCCallbackLua, "OnTimer", 2);
+						m_minGoal += (60.0f);
+					}
+
+					if (m_tickCounter >= m_hourGoal) {
+						Script::CallMethod(m_ServerRPCCallbackLua, "OnTimer", 3);
+						m_hourGoal += (3600.f);
+					}
 				}
 
 
@@ -163,11 +210,41 @@ void Server::UpdateLoop()
 
 		if (m_pSS)
 			m_pSS->SetGlobalValue("DLL_ERROR", false);
-	
-		//GetStats()->Update(gEnv->pTimer->GetAsyncTime().GetMilliSeconds());
-		//CryLogAlways("%.2f", GetStats()->GetCPUUsage());
+
+		// exists already :s
+		//UpdateEntityRemoval();
 	}
 
+
+	// Save Data !!
+	if (IsLuaReady()) {
+		GetEvents()->Call("ServerRPC.Callbacks.OnGameShutdown");
+	}
+
+}
+
+// -------------------------------------
+void Server::UpdateEntityRemoval()
+{
+
+	float frameTime = gEnv->pTimer->GetCurrTime();
+	IEntitySystem* pEntitySystem = gEnv->pEntitySystem;
+
+	if (m_scheduledEntityRemovals.empty())
+		return;
+
+	// Iterate and remove EntityId 6789
+	for (auto it = m_scheduledEntityRemovals.begin(); it != m_scheduledEntityRemovals.end(); /* no increment here */) {
+		if (it->second >= frameTime) {  // Access the EntityId using it->first
+
+			//FIXME
+			//pEntitySystem->RemoveEntity(it->first);
+			it = m_scheduledEntityRemovals.erase(it);  // Remove element and get new iterator
+		}
+		else {
+			++it;  // Move to the next element
+		}
+	}
 }
 
 // -------------------------------------
@@ -189,7 +266,7 @@ void Server::InitCVars(IConsole *pConsole)
 }
 
 // -------------------------------------
-bool Server::ReadCfg(std::string filepath)
+bool Server::ReadCfg(const std::string &filepath)
 {
 	std::ifstream file(filepath);
 	if (!file.is_open()) {
@@ -409,6 +486,9 @@ void Server::OnLoadingStart(ILevelInfo* pLevel)
 // -------------------------------------
 void Server::OnLoadingComplete(ILevel* pLevel)
 {
+	if (m_pSS)
+		m_pSS->SetGlobalValue("MAP_START_TIME", gEnv->pTimer->GetCurrTime());
+
 	InitLua();
 }
 
@@ -491,10 +571,111 @@ void Server::HandleScriptError(const std::string &error)
 }
 
 // -------------------------------------
+bool Server::UpdateGameSpyServerReport(EGameSpyUpdateType type, const char* key, const char* value, int index) {
+
+	INetworkService* pGS = GetGSMaster();
+	if (!pGS || pGS == nullptr)
+		return false;
+
+
+	IServerReport* pGSReport = pGS->GetServerReport();
+	if (!pGSReport)
+		return false;
+
+	switch (type) {
+	case EGameSpyUpdateType::eGSUpdate_Server:
+		pGSReport->SetServerValue(key, value);
+		break;
+
+	case EGameSpyUpdateType::eGSUpdate_Player:
+		pGSReport->SetPlayerValue(index, key, value);
+		break;
+
+	case EGameSpyUpdateType::eGSUpdate_Team:
+		pGSReport->SetTeamValue(index, key, value);
+		break;
+
+	default:
+		break;
+	}
+
+	pGSReport->Update();
+	return true;
+}
+
+// -------------------------------------
+void Server::InitGameOverwrites(const std::string& filename) {
+
+	std::ifstream file(filename);
+	std::string line;
+
+	if (!file.is_open()) {
+		LogError( "Failed to open %s", filename.c_str());
+		return;
+	}
+
+	std::string root = m_rootDir.filename().string();
+
+	while (std::getline(file, line)) {
+		// Find the '=' character
+		size_t pos = line.find('=');
+		if (pos != std::string::npos) {
+			// Split the line into STRING1 and STRING2
+			std::string game_original = line.substr(0, pos);
+			std::string game_replace = line.substr(pos + 1);
+
+			// Trim any whitespace around the strings (optional)
+			game_original.erase(0, game_original.find_first_not_of(" \t"));
+			game_original.erase(game_original.find_last_not_of(" \t") + 1);
+			game_replace.erase(0, game_replace.find_first_not_of(" \t"));
+			game_replace.erase(game_replace.find_last_not_of(" \t") + 1);
+
+			// Add to the vector
+			Log("Added overwrite: %s = %s", game_original.c_str(), game_replace.c_str());
+			//m_pOverwriteSF.push_back(std::make_pair(game_original, std::string(/*"../" +*/ root + "/" + game_replace)));
+			m_pOverwriteSF.push_back(std::make_pair(game_original, std::string(m_rootDir.string() + "/" + game_replace))); // ned to make it a full path!
+		}
+	}
+
+	file.close();
+}
+
+// -------------------------------------
+bool Server::OverwriteScriptPath( std::string &output, const std::string& input) {
+	
+
+	std::string lowerInput = input;
+	std::transform(lowerInput.begin(), lowerInput.end(), lowerInput.begin(), ::tolower);
+
+
+	// Find the element with the matching key in the vector
+	auto it = std::find_if(m_pOverwriteSF.begin(), m_pOverwriteSF.end(),
+		[&lowerInput](const std::pair<std::string, std::string>& pair) {
+			CryLogAlways("compare %-30s->%s", pair.first.c_str(), lowerInput.c_str());
+
+			std::string lowerFirst = pair.first;
+			std::transform(lowerFirst.begin(), lowerFirst.end(), lowerFirst.begin(), ::tolower);
+
+
+			return lowerFirst == lowerInput;
+		});
+
+	// If found, overwrite the path
+	if (it != m_pOverwriteSF.end()) {
+		output = it->second;  // Assign the new value as needed
+		return true;
+	}
+
+	// If not found, you may want to handle it differently
+	return false;
+
+}
+
+// -------------------------------------
 void Server::Log(const char* format, ...) {
 	va_list args;
 	va_start(args, format);
-	ServerLog::Log("$9[$4ATOM$9] ", format, args);
+	ServerLog::Log("$9[$4CryMP-Server$9] ", format, args);
 	va_end(args);
 }
 
@@ -502,7 +683,7 @@ void Server::Log(const char* format, ...) {
 void Server::LogError(const char* format, ...) {
 	va_list args;
 	va_start(args, format);
-	ServerLog::Log("$9[$4ATOM$9] Error: ", format, args);
+	ServerLog::Log("$9[$4CryMP-Server$9] Error: ", format, args);
 	va_end(args);
 }
 
@@ -510,6 +691,6 @@ void Server::LogError(const char* format, ...) {
 void Server::LogWarning(const char* format, ...) {
 	va_list args;
 	va_start(args, format);
-	ServerLog::Log("$9[$4ATOM$9] Warning: ", format, args);
+	ServerLog::Log("$9[$4CryMP-Server$9] Warning: ", format, args);
 	va_end(args);
 }

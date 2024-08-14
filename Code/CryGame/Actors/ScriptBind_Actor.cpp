@@ -43,6 +43,9 @@ CScriptBind_Actor::CScriptBind_Actor(ISystem* pSystem)
 #undef SCRIPT_REG_CLASSNAME
 #define SCRIPT_REG_CLASSNAME &CScriptBind_Actor::
 
+	// Server
+	// SCRIPT_REG_FUNC(GetVehicleViewDir);
+
 	SCRIPT_REG_FUNC(DumpActorInfo);
 	SCRIPT_REG_FUNC(SetViewAngleOffset);
 	SCRIPT_REG_FUNC(GetViewAngleOffset);
@@ -159,6 +162,11 @@ CScriptBind_Actor::CScriptBind_Actor(ISystem* pSystem)
 	SCRIPT_REG_FUNC(GetLookAtEntity);
 	SCRIPT_REG_TEMPLFUNC(GetLookAtPoint, "");
 
+	//Server:
+	SCRIPT_REG_FUNC(GetRotation);
+	SCRIPT_REG_TEMPLFUNC(SetGodMode, "mode");
+	SCRIPT_REG_TEMPLFUNC(SetActorMode, "mode, value");
+
 	m_pSS->SetGlobalValue("STANCE_PRONE", STANCE_PRONE);
 	m_pSS->SetGlobalValue("STANCE_CROUCH", STANCE_CROUCH);
 	m_pSS->SetGlobalValue("STANCE_STAND", STANCE_STAND);
@@ -177,6 +185,10 @@ CScriptBind_Actor::CScriptBind_Actor(ISystem* pSystem)
 	m_pSS->SetGlobalValue("NANOMODE_CLOAK", NANOMODE_CLOAK);
 	m_pSS->SetGlobalValue("NANOMODE_DEFENSE", NANOMODE_DEFENSE);
 	m_pSS->SetGlobalValue("NANOSUIT_ENERGY", NANOSUIT_ENERGY);
+
+	// SERVER
+	m_pSS->SetGlobalValue("ACTORMODE_UNLIMITEDAMMO", 1);
+	m_pSS->SetGlobalValue("ACTORMODE_UNLIMITEDITEMS", 2);
 }
 
 //------------------------------------------------------------------------
@@ -213,6 +225,63 @@ CActor* CScriptBind_Actor::GetActor(IFunctionHandler* pH)
 	}
 
 	return 0;
+}
+
+
+//------------------------------------------------------------------------
+// SERVER
+int CScriptBind_Actor::SetActorMode(IFunctionHandler* pH, int mode, int value)
+{
+	CActor* pActor = GetActor(pH);
+	if (!pActor)
+		return pH->EndFunction();
+
+	switch (mode) {
+		case 1: // unlimitedammo
+		{
+			pActor->m_unlimitedAmmo = value;
+			break;
+		}
+		case 2:
+		{
+			pActor->m_unlimitedWeapons = value;
+			break;
+		}
+	default:
+		break;
+	}
+
+	return pH->EndFunction();
+}
+
+//------------------------------------------------------------------------
+// SERVER
+int CScriptBind_Actor::SetGodMode(IFunctionHandler* pH, int mode)
+{
+	CActor* pActor = GetActor(pH);
+	if (!pActor)
+		return pH->EndFunction();
+
+	pActor->m_godMode = mode;
+	return pH->EndFunction();
+}
+
+
+//------------------------------------------------------------------------
+// SERVER
+int CScriptBind_Actor::GetRotation(IFunctionHandler* pH)
+{
+	CActor* pActor = GetActor(pH);
+	if (!pActor)
+		return pH->EndFunction();
+
+	Quat qrot = pActor->GetEntity()->GetRotation();
+	Vec3 rot;
+	rot.x = qrot.GetFwdX();
+	rot.y = qrot.GetFwdY();
+	rot.z = qrot.GetFwdZ();
+
+	return pH->EndFunction(rot);
 }
 
 

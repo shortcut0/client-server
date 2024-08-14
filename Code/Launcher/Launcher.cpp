@@ -666,6 +666,12 @@ void Launcher::LoadEngine()
 			throw StringTools::SysErrorFormat("Failed to load the fmodex DLL!");
 #endif
 		}
+
+
+		m_dlls.pCryRenderNULL = WinAPI::DLL::Load("CryRenderNULL.dll");
+		if (!m_dlls.pCryRenderNULL)
+		{
+		}
 	}
 }
 
@@ -745,10 +751,18 @@ void Launcher::PatchEngine()
 	{
 		MemoryPatch::FMODEx::Fix64BitHeapAddressTruncation(m_dlls.pFmodEx);
 	}
+
+	if (m_dlls.pCryRenderNULL)
+	{
+		MemoryPatch::CryRenderNULL::DisableDebugRenderer(m_dlls.pCryRenderNULL, 6156);
+	}
 }
 
 void Launcher::StartEngine()
 {
+
+	std::cout << "[debug] log 1 \n";
+
 	auto entry = static_cast<IGameFramework::TEntryFunction>(WinAPI::DLL::GetSymbol(m_dlls.pCryAction, "CreateGameFramework"));
 	if (!entry)
 	{
@@ -761,7 +775,10 @@ void Launcher::StartEngine()
 		throw StringTools::ErrorFormat("Failed to create the GameFramework Interface!");
 	}
 
-	GameWindow::GetInstance().Init();
+	//std::cout << "well hell there\n";
+	//GameWindow::GetInstance().Init();
+	//std::cout << "game window is OK!";
+	std::cout << "[debug] log 2 \n";
 
 	// initialize CryEngine
 	// Launcher::OnInit is called here
@@ -769,21 +786,29 @@ void Launcher::StartEngine()
 	{
 		throw StringTools::ErrorFormat("CryENGINE initialization failed!");
 	}
+	std::cout << "[debug] log 3 (after gameframeowkr init) \n";
 
 #ifdef CRYMP_TRACY_ENABLED
 	TracyHookEngineProfiler();
 #endif
 
+	std::cout << "[debug] log 4 tracy \n";
 	
 	//gClient->Init(pGameFramework);
 	gServer->Init(pGameFramework);
+
+	std::cout << "[debug] log 5 server init \n";
 
 	if (!pGameFramework->CompleteInit())
 	{
 		throw StringTools::ErrorFormat("CryENGINE post-initialization failed!");
 	}
 
+	std::cout << "[debug] log 6 completed init \n";
+
 	gEnv->pSystem->ExecuteCommandLine();
+
+	std::cout << "[debug] 7 commandline() \n";
 }
 
 Launcher::Launcher()
@@ -824,6 +849,7 @@ void Launcher::OnInit(ISystem* pSystem)
 	//rootDirPath = "C:/Users/me/Desktop/Server - ATOM/ATOM - 2024/";
 
 	const char* defaultVerbosity = "0";
+	//const char* defaultLogFileName = "Logs\\CryMP-Server.log";
 	const char* defaultLogFileName = "Logs\\CryMP-Server.log";
 	const char* defaultLogPrefix = "";
 
@@ -886,10 +912,15 @@ void Launcher::Run()
 {
 	m_params.hInstance = WinAPI::DLL::Get(nullptr);  // EXE handle
 	
-	//m_params.pUserCallback = this;
+	// Server (Force Dedicated Mode if headless argument was specified.)
+	if (WinAPI::CmdLine::HasArg("-headless")) {
+		m_params.isDedicatedServer = true;
+		m_params.pUserCallback = this;
+	}
+
 	m_params.isDedicatedServer = true;
-	
 	m_params.pLog = &Logger::GetInstance();
+
 
 	this->SetCmdLine();
 
@@ -908,6 +939,7 @@ void Launcher::Run()
 	//	throw StringTools::ErrorFormat("Running as a dedicated server is not supported!");
 	}
 
+
 	this->InitWorkingDirectory();
 
 	this->LoadEngine();
@@ -920,7 +952,6 @@ void Launcher::Run()
 
 	Server server;
 	gServer = &server;
-
 	this->StartEngine();
 
 	gServer->UpdateLoop();

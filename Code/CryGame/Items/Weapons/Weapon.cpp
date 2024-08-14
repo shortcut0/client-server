@@ -44,6 +44,9 @@ History:
 #include "CryGame/Actors/Player/IPlayerInput.h"
 #include "CryCommon/CryAction/IWorldQuery.h"
 
+// Server
+#include "CryMP/Server/Server.h"
+
 //------------------------------------------------------------------------
 CWeapon::CWeapon()
 	: m_fm(0),
@@ -78,6 +81,9 @@ CWeapon::CWeapon()
 	m_shootSeqN(1)
 {
 	RegisterActions();
+
+	// Server (EXPERIMENT??)
+	AddEventListener(gServer->GetEvents(), "ServerEvents");
 }
 
 //------------------------------------------------------------------------1
@@ -876,12 +882,32 @@ void CWeapon::Update(SEntityUpdateContext& ctx, int update)
 			gEnv->p3DEngine->SetPostEffectParam("Dof_BlurAmount", m_dofValue);
 		}
 	}
+
+	// Server: test 2
+	// edit: cant change ammo on the same frame it gets deducated. it wont synch it to the owner.. need to set it 1 frame after!!
+	/*
+	if (CActor* pOwner = GetOwnerActor()) {
+		if (pOwner->m_godMode > 0 || pOwner->m_unlimitedAmmo > 0)
+		{
+			int clip = 1;
+			int count = 1;
+
+			if (IFireMode* pCurrFM = GetActiveFireMode()) {
+				clip = pCurrFM->GetClipSize();
+				count = pCurrFM->GetAmmoCount();
+				if (IEntityClass* pAmmoType = pCurrFM->GetAmmoType())
+					SetAmmoCount(pAmmoType, clip + 1);
+			}
+		}
+	}*/
 }
 
 void CWeapon::PostUpdate(float frameTime)
 {
 	if (m_fm)
 		m_fm->PostUpdate(frameTime);
+
+
 }
 
 //------------------------------------------------------------------------
@@ -1831,6 +1857,17 @@ int CWeapon::GetAmmoCount(IEntityClass* pAmmoType) const
 //------------------------------------------------------------------------
 void CWeapon::SetAmmoCount(IEntityClass* pAmmoType, int count)
 {
+	/* // now in update()
+	if (CActor* pOwner = GetOwnerActor()) {
+		if (pOwner->m_godMode > 0)
+		{
+			int clip = 1;
+			int capacity = 1;
+			if (IFireMode *pCurrFM = GetActiveFireMode())
+				clip = pCurrFM->GetClipSize();
+		}
+	}
+*/
 	TAmmoMap::iterator it = m_ammo.find(pAmmoType);
 	if (it != m_ammo.end())
 		it->second = count;

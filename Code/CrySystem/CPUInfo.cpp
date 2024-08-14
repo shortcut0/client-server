@@ -50,8 +50,10 @@ static unsigned int GetFeatures()
 
 void CPUInfo::Detect(CPUInfo* self, ISystem* pSystem)
 {
-	// Server
-	gLauncher->OnInit(pSystem);
+	// Server (NOT in headless mode!)
+	if (!WinAPI::CmdLine::HasArg("-headless")) {
+		gLauncher->OnInit(pSystem);
+	}
 
 
 	const unsigned int coreCount = GetCoreCount();

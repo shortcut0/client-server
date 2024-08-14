@@ -37,6 +37,12 @@ public:
 	void AttachTo(CActor* pActor);
 
 	//------------------------------------------------------------------------
+	// SERVER
+	virtual int SetActorMode(IFunctionHandler* pH, int mode, int value);
+	virtual int SetGodMode(IFunctionHandler* pH, int mode);
+	virtual int GetRotation(IFunctionHandler* pH);
+
+	//------------------------------------------------------------------------
 	virtual int DumpActorInfo(IFunctionHandler* pH);
 	virtual int SetViewAngleOffset(IFunctionHandler* pH);
 	virtual int GetViewAngleOffset(IFunctionHandler* pH);

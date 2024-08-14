@@ -1469,7 +1469,7 @@ void CItem::PickUp(EntityId pickerId, bool sound, bool select, bool keepHistory)
 		return;
 
 	//1) First check inventory restrictions (only in the server)
-	if (IsServer())
+	if (IsServer() && pActor->m_unlimitedWeapons <= 0)
 	{
 		if (!pActor->CheckInventoryRestrictions(GetEntity()->GetClass()->GetName()))
 		{

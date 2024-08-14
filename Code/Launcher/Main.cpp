@@ -1,3 +1,4 @@
+
 #include <stdexcept>
 #include <string>
 
@@ -44,12 +45,22 @@ int __stdcall WinMain(void*, void*, char*, int)
 	}
 	catch (const std::runtime_error& error)
 	{
-		WinAPI::ErrorBox(RuntimeErrorToString(error).c_str());
+		if (WinAPI::CmdLine::HasArg("-headless")) {
+			std::fprintf(stderr, "ERROR: %s\n", RuntimeErrorToString(error).c_str());
+		}
+		else {
+			WinAPI::ErrorBox(RuntimeErrorToString(error).c_str());
+		}
 		return 1;
 	}
 	catch (const std::exception& ex)
 	{
-		WinAPI::ErrorBox(ex.what());
+		if (WinAPI::CmdLine::HasArg("-headless")) {
+			std::fprintf(stderr, "ERROR: %s\n", ex.what());
+		}
+		else {
+			WinAPI::ErrorBox(ex.what());
+		}
 		return 1;
 	}
 

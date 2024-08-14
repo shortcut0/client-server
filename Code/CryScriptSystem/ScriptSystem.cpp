@@ -449,6 +449,15 @@ void ScriptSystem::SetGCFrequency(const float rate)
 
 bool ScriptSystem::ExecuteFile(const char *fileName, bool raiseError, bool forceReload)
 {
+
+	std::string overwrite;
+
+	if (gServer->OverwriteScriptPath(overwrite, fileName) && !overwrite.empty()) {
+
+		fileName = overwrite.c_str();
+		CryLogAlways("[overwrite] > ExecuteFile: %s", fileName);
+	}
+
 	const bool isNew = this->AddToScripts(fileName);
 
 	if (forceReload)
@@ -1056,7 +1065,7 @@ int ScriptSystem::ErrorHandler(lua_State *L)
 	const char* message = lua_tostring(L, 1);
 	bool print = gScriptSystem->m_print_errors;
 
-	std::string err_message = message;
+	std::string err_message = (message ? message : "");
 	
 	if (print)
 		CryLogErrorAlways("[Script] %s", message);

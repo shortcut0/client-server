@@ -1547,8 +1547,10 @@ int CScriptBind_GameRules::SendTextMessage(IFunctionHandler* pH, int type, const
 			p[3].empty() ? 0 : p[3].c_str()
 		);
 	}
-	else
+	else {
+		//CryLogAlways("sending %s", msg);
 		pGameRules->SendTextMessage((ETextMessageType)type, msg, to, channelId);
+	}
 
 	return pH->EndFunction();
 }

@@ -1441,7 +1441,7 @@ void CGameRules::EndVoting(bool success)
 		{
 			int ch_id = GetChannelId(m_pVotingSystem->GetEntityId());
 			if (INetChannel* pNetChannel = m_pGameFramework->GetNetChannel(ch_id))
-				pNetChannel->Disconnect(eDC_Kicked, "Kicked from server by voting");
+				pNetChannel->Disconnect(eDC_Kicked, "Kicked from server by voting"); 
 		}
 		break;
 		case eVS_nextMap:
@@ -2922,7 +2922,7 @@ void CGameRules::SendChatMessage(EChatMessageType type, EntityId sourceId, Entit
 		bool show = true;
 		gServer->GetEvents()->Get("ServerRPC.Callbacks.OnChatMessage", show, int(type), ScriptHandle(sourceId), ScriptHandle(targetId), msg, m_chatScriptBind_forcedTeam, m_chatScriptBind_svChat);
 		
-		CryLogAlways("Show = %s", show ? "yes" : "no");
+		//CryLogAlways("Show = %s", show ? "yes" : "no");
 		if (show) {
 			switch (type)
 			{
@@ -3609,6 +3609,11 @@ void CGameRules::Restart()
 void CGameRules::NextLevel()
 {
 	if (!gEnv->bServer)
+		return;
+
+	// Server
+	bool changed = false;
+	if (gServer->GetEvents()->Get("ServerMaps.OnNextLevel", changed) && changed)
 		return;
 
 	ILevelRotation* pLevelRotation = m_pGameFramework->GetILevelSystem()->GetLevelRotation();

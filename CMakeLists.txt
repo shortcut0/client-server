@@ -740,7 +740,7 @@ add_executable(${CRYMP_SERVER_EXE} WIN32
 	ThirdParty/tracy/public/TracyClient.cpp
 	${PROJECT_BINARY_DIR}/config.h
 	${PROJECT_BINARY_DIR}/version.h
- "Code/CryMP/Server/ServerPublisher.cpp" "Code/CryMP/Server/ServerPublisher.h" "Code/CryMP/Server/ServerLog.h" "Code/CryMP/Server/ServerEvents.h" "Code/CryMP/Server/ServerEvents.cpp" "Code/CryMP/Server/ScriptBind_Server.cpp" "Code/CryMP/Server/ScriptBind_Server.h" "Code/CryMP/Server/LuaFileSystem.cpp" "Code/CryMP/Server/LuaFileSystem.h" "Code/CryMP/Server/ServerUtils.h" "Code/CryMP/Server/ServerCVars.h" "Code/CryMP/Server/ServerCVars.cpp" "Code/CryMP/Server/ServerStats.h" )
+ "Code/CryMP/Server/ServerPublisher.cpp" "Code/CryMP/Server/ServerPublisher.h" "Code/CryMP/Server/ServerLog.h" "Code/CryMP/Server/ServerEvents.h" "Code/CryMP/Server/ServerEvents.cpp" "Code/CryMP/Server/ScriptBind_Server.cpp" "Code/CryMP/Server/ScriptBind_Server.h" "Code/CryMP/Server/LuaFileSystem.cpp" "Code/CryMP/Server/LuaFileSystem.h" "Code/CryMP/Server/ServerUtils.h" "Code/CryMP/Server/ServerCVars.h" "Code/CryMP/Server/ServerCVars.cpp" "Code/CryMP/Server/ServerStats.h"  "Code/CryMP/Server/ServerCVarCallbacks.h")
 
 ################################################################################
 

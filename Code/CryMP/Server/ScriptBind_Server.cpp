@@ -35,6 +35,11 @@ ScriptBind_Server::ScriptBind_Server()
 	//SCRIPT_REG_GLOBAL(SCRIPT_CALLBACK_ON_BECOME_LOCAL_ACTOR);
 	//SCRIPT_REG_GLOBAL(SV_EVENT_ON_MASTER_RESOLVED);
 
+	// New
+	RegisterGlobal("eGSUpdate_Server", (int)EGameSpyUpdateType::eGSUpdate_Server);
+	RegisterGlobal("eGSUpdate_Player", (int)EGameSpyUpdateType::eGSUpdate_Player);
+	RegisterGlobal("eGSUpdate_Team",   (int)EGameSpyUpdateType::eGSUpdate_Team);
+
 	// CryMP
 	SCRIPT_REG_TEMPLFUNC(GetMapName, "");
 	SCRIPT_REG_TEMPLFUNC(Random, "");
@@ -67,6 +72,12 @@ ScriptBind_Server::ScriptBind_Server()
 	SCRIPT_REG_FUNC(GetMemPeak);
 	SCRIPT_REG_FUNC(GetCPUUsage);
 	SCRIPT_REG_FUNC(GetCPUName);
+	SCRIPT_REG_TEMPLFUNC(GetItemCategory, "item");
+	SCRIPT_REG_TEMPLFUNC(GetLevels, "");   // Returns all available levels
+	SCRIPT_REG_TEMPLFUNC(IsValidEntityClass, "class");   // Returns true if specified entity class is valid (exists)
+	SCRIPT_REG_TEMPLFUNC(IsValidItemClass, "class");   // Returns true if specified entity class is valid (exists)
+	SCRIPT_REG_FUNC(GetEntityClasses);   // Returns true if specified entity class is valid (exists)
+	SCRIPT_REG_FUNC(GetItemClasses);   // Returns true if specified entity class is valid (exists)
 
 	// Network
 	SCRIPT_REG_TEMPLFUNC(Request, "params, callback");
@@ -75,11 +86,165 @@ ScriptBind_Server::ScriptBind_Server()
 	SCRIPT_REG_TEMPLFUNC(GetChannelNick, "channel");
 	SCRIPT_REG_TEMPLFUNC(GetChannelIP, "channel");
 	SCRIPT_REG_TEMPLFUNC(GetChannelName, "channel");
+	SCRIPT_REG_TEMPLFUNC(KickChannel, "type, channel,reason");
+	SCRIPT_REG_TEMPLFUNC(UpdateGameSpyReport, "type, key, val");
+
+	SCRIPT_REG_TEMPLFUNC(FSetCVar, "cvar, value");
 }
 
 // -------------------------------------
 ScriptBind_Server::~ScriptBind_Server()
 {
+}
+
+// --------------------------------------------------------------------------------
+// Describe this
+int ScriptBind_Server::FSetCVar(IFunctionHandler* pH, const char* cvar, const char* value)
+{
+	ICVar* pCVar = gEnv->pConsole->GetCVar(cvar);
+	if (!pCVar)
+	{
+		return pH->EndFunction(false);
+	}
+
+	const std::string previousVal = pCVar->GetString();
+
+	if (previousVal != std::string_view(value))
+	{
+		pCVar->ForceSet(value);
+
+		// CVar still the same, is it synced?
+		if (previousVal == std::string_view(pCVar->GetString()))
+		{
+			const int previousFlags = pCVar->GetFlags();
+
+			// disable sync
+			pCVar->SetFlags(VF_NOT_NET_SYNCED);
+
+			// 2nd attempt
+			pCVar->ForceSet(value);
+
+			// now restore the flags
+			pCVar->SetFlags(previousFlags);
+			// CVar value won't change untill server changes it to something else
+
+			if (std::string_view(value) != std::string_view(pCVar->GetString()))
+			{
+				CryLogAlways("$4[CryMP] Failed to change CVar %s - value still %s", cvar, pCVar->GetString());
+				return pH->EndFunction(false);
+			}
+		}
+	}
+
+	// all good!
+	return pH->EndFunction(true);
+}
+
+// --------------------------------------------------------------------------------
+// Describe this
+int ScriptBind_Server::GetItemClasses(IFunctionHandler* pH) {
+
+	SmartScriptTable pClasses = gEnv->pScriptSystem->CreateTable();
+	IEntityClass* pClass = NULL;
+
+	IItemSystem* pItemSystem = gEnv->pGame->GetIGameFramework()->GetIItemSystem();
+	if (!pItemSystem)
+		return pH->EndFunction();
+
+	IEntityClassRegistry* pEntityRegistry = gEnv->pEntitySystem->GetClassRegistry();
+	if (!pEntityRegistry)
+		return pH->EndFunction();
+
+	for (pEntityRegistry->IteratorMoveFirst(); pClass = pEntityRegistry->IteratorNext();)
+	{
+		if (pClass != NULL) {
+			if (pItemSystem->IsItemClass(pClass->GetName()))
+				pClasses->PushBack(pClass->GetName());
+
+		}
+	}
+
+	return pH->EndFunction(pClasses);
+}
+
+// --------------------------------------------------------------------------------
+// Describe this
+int ScriptBind_Server::GetEntityClasses(IFunctionHandler* pH) {
+
+	SmartScriptTable pClasses = gEnv->pScriptSystem->CreateTable();
+	IEntityClass* pClass = NULL;
+
+	IEntityClassRegistry* pEntityRegistry = gEnv->pEntitySystem->GetClassRegistry();
+	if (!pEntityRegistry)
+		return pH->EndFunction();
+
+	for (pEntityRegistry->IteratorMoveFirst(); pClass = pEntityRegistry->IteratorNext();)
+	{
+		if (pClass != NULL) {
+			pClasses->PushBack(pClass->GetName());
+		}
+		else
+			break;
+	}
+
+	return pH->EndFunction(pClasses);
+}
+
+// --------------------------------------------------------------------------------
+// Describe this
+int ScriptBind_Server::IsValidEntityClass(IFunctionHandler* pH, const char* name) {
+
+	if (!name)
+		return pH->EndFunction(false);
+
+	IEntityClass* pEntityClass = gEnv->pEntitySystem->GetClassRegistry()->FindClass(name);
+	return pH->EndFunction((pEntityClass != 0));
+}
+
+// --------------------------------------------------------------------------------
+// Describe this
+int ScriptBind_Server::IsValidItemClass(IFunctionHandler* pH, const char* name) {
+
+	if (!name)
+		return pH->EndFunction(false);
+	;
+
+	return pH->EndFunction(gEnv->pGame->GetIGameFramework()->GetIItemSystem()->IsItemClass(name));
+}
+
+// --------------------------------------------------------------------------------
+// Describe this
+int ScriptBind_Server::GetLevels(IFunctionHandler* pH) {
+
+	ILevelSystem* pLevelSystem = gEnv->pGame->GetIGameFramework()->GetILevelSystem();
+	const int levelCount = pLevelSystem->GetLevelCount();
+	SmartScriptTable lvlTable(gEnv->pScriptSystem->CreateTable());
+
+	for (int i = 0; i < levelCount; i++)
+	{
+		const ILevelInfo* pLevelInfo = pLevelSystem->GetLevelInfo(i);
+
+		SmartScriptTable lvTable(gEnv->pScriptSystem->CreateTable());
+		lvTable->PushBack(pLevelInfo->GetName());
+
+		for (int j = 0; j < pLevelInfo->GetGameTypeCount(); j++)
+			lvTable->PushBack(pLevelInfo->GetGameType(j)->name.c_str());
+		//	lvTable->PushBack(pLevelInfo->GetGameType(j));
+
+		lvlTable->PushBack(lvTable);
+		// ...
+	}
+	return pH->EndFunction(lvlTable);
+}
+
+// -------------------------------------
+int ScriptBind_Server::GetItemCategory(IFunctionHandler* pH, const char* item)
+{
+	IItemSystem* pItemSystem = gEnv->pGame->GetIGameFramework()->GetIItemSystem();
+	if (!pItemSystem)
+		return pH->EndFunction("");
+
+	return pH->EndFunction(pItemSystem->GetItemCategory(item));
 }
 
 // -------------------------------------
@@ -405,5 +570,27 @@ int ScriptBind_Server::GetChannelName(IFunctionHandler* pH, int channelId)
 		return pH->EndFunction(pChannel->GetName());
 	}
 
+	return pH->EndFunction();
+}
+
+// -------------------------------------
+int ScriptBind_Server::KickChannel(IFunctionHandler* pH, int type, int channelId, const char*reason)
+{
+	if (INetChannel* pChannel = g_pGame->GetIGameFramework()->GetNetChannel(channelId)) {
+		pChannel->Disconnect((EDisconnectionCause)type, reason);
+	}
+
+	return pH->EndFunction();
+}
+
+
+// -------------------------------------
+int ScriptBind_Server::UpdateGameSpyReport(IFunctionHandler* pH, int type, const char* key, const char* val)
+{
+	int index = 0;
+	if (pH->GetParamCount() >= 4)
+		pH->GetParam(4, index);
+
+	gServer->UpdateGameSpyServerReport((EGameSpyUpdateType)type, key, val, index);
 	return pH->EndFunction();
 }

@@ -43,6 +43,9 @@
 
 #include "CryCommon/CryAnimation/IFacialAnimation.h"
 
+// Server
+#include "CryMP/Server/Server.h"
+
 IItemSystem* CActor::m_pItemSystem = 0;
 IGameFramework* CActor::m_pGameFramework = 0;
 IGameplayRecorder* CActor::m_pGameplayRecorder = 0;
@@ -2022,16 +2025,17 @@ bool CActor::IsClient() const
 	return m_isClient;
 }
 
+
 bool CActor::SetAspectProfile(EEntityAspects aspect, uint8 profile)
 {
 	bool res(false);
 
 	if (aspect == eEA_Physics)
 	{
-		/*CryLog("%s::SetProfile(%d): %s (was: %d %s)", GetEntity()->GetName(),
-			profile, profile==eAP_Alive?"alive":(profile==eAP_Ragdoll?"ragdoll":(profile==eAP_Spectator?"spectator":(profile==eAP_Frozen?"frozen":"unknown"))),
-			m_currentPhysProfile, m_currentPhysProfile==eAP_Alive?"alive":(m_currentPhysProfile==eAP_Ragdoll?"ragdoll":(m_currentPhysProfile==eAP_Spectator?"spectator":(m_currentPhysProfile==eAP_Frozen?"frozen":"unknown"))));
-*/
+		//CryLog("%s::SetProfile(%d): %s (was: %d %s)", GetEntity()->GetName(),
+	//		profile, profile==eAP_Alive?"alive":(profile==eAP_Ragdoll?"ragdoll":(profile==eAP_Spectator?"spectator":(profile==eAP_Frozen?"frozen":"unknown"))),
+//			m_currentPhysProfile, m_currentPhysProfile==eAP_Alive?"alive":(m_currentPhysProfile==eAP_Ragdoll?"ragdoll":(m_currentPhysProfile==eAP_Spectator?"spectator":(m_currentPhysProfile==eAP_Frozen?"frozen":"unknown"))));
+
 		if (m_currentPhysProfile == profile && !gEnv->pSystem->IsSerializingFile()) //rephysicalize when loading savegame
 			return true;
 
@@ -2116,14 +2120,15 @@ bool CActor::SetAspectProfile(EEntityAspects aspect, uint8 profile)
 				//CryMP: Only keep this code for MP
 				//removes that dropping to floor when connect
 				//moved to Revive
-				/*if (profile == eAP_Spectator)
-				{
-					if (ICharacterInstance* pCharacter = GetEntity()->GetCharacter(0))
-						pCharacter->GetISkeletonPose()->DestroyCharacterPhysics(1);
+				//if (profile == eAP_Spectator)
+			//	{
+				//	if (ICharacterInstance* pCharacter = GetEntity()->GetCharacter(0))
+			//			pCharacter->GetISkeletonPose()->DestroyCharacterPhysics(1);
 
-					m_pAnimatedCharacter->ForceRefreshPhysicalColliderMode();
-					m_pAnimatedCharacter->RequestPhysicalColliderMode(eColliderMode_Spectator, eColliderModeLayer_Game, "Actor::SetAspectProfile");
-				}*/
+				//	m_pAnimatedCharacter->ForceRefreshPhysicalColliderMode();
+				//	m_pAnimatedCharacter->RequestPhysicalColliderMode(eColliderMode_Spectator, eColliderModeLayer_Game, "Actor::SetAspectProfile");
+				//}
+
 				//CryMP: Physicalize only OnRevive
 				if (wasFrozen)
 				{
@@ -2207,6 +2212,32 @@ bool CActor::SetAspectProfile(EEntityAspects aspect, uint8 profile)
 
 	return res;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 void CActor::ProfileChanged(uint8 newProfile)
 {
@@ -3378,6 +3409,35 @@ void CActor::SetSleepTimer(float timer)
 //------------------------------------------------------------------------
 IMPLEMENT_RMI(CActor, SvRequestDropItem)
 {
+	// ---------------------------------------
+	// Server
+	uint16 pChannelId = m_pGameFramework->GetGameChannelId(pNetChannel);
+	if (!pChannelId) {
+		return false;
+	}
+
+	CActor* pNetActor = GetActorByChannel(pChannelId);
+	if (!pNetActor) {
+		return false;
+	}
+
+	EntityId pNetId = pNetActor->GetEntityId();
+	EntityId pActorId = GetEntityId();
+	if (pActorId != pNetId) {
+		gServer->GetEvents()->Call("ServerRPC.Callbacks.OnCheat", pChannelId, "RMI Spoof (SvRequestDropItem)", ScriptHandle(GetEntityId()), ScriptHandle(params.itemId));
+		return false;
+	}
+
+	// Server
+	bool ok = true;
+	if (gServer->GetEvents()->Get("ServerRPC.Callbacks.CanDropWeapon", ok, ScriptHandle(GetEntityId()), ScriptHandle(params.itemId)) && !ok) {
+		return true;
+	}
+
+	// ...
+	// ---------------------------------------
+
+
 	CItem* pItem = GetItem(params.itemId);
 	if (!pItem)
 	{
@@ -3395,6 +3455,28 @@ IMPLEMENT_RMI(CActor, SvRequestDropItem)
 //------------------------------------------------------------------------
 IMPLEMENT_RMI(CActor, SvRequestPickUpItem)
 {
+	// ---------------------------------------
+	// Server
+	uint16 pChannelId = m_pGameFramework->GetGameChannelId(pNetChannel);
+	if (!pChannelId) {
+		return false;
+	}
+
+	CActor* pNetActor = GetActorByChannel(pChannelId);
+	if (!pNetActor) {
+		return false;
+	}
+
+	EntityId pNetId = pNetActor->GetEntityId();
+	EntityId pActorId = GetEntityId();
+	if (pActorId != pNetId) {
+		gServer->GetEvents()->Call("ServerRPC.Callbacks.OnCheat", pChannelId, "RMI Spoof (SvRequestPickupItem)", ScriptHandle(GetEntityId()), ScriptHandle(params.itemId));
+		return false;
+	}
+	// ...
+	// ---------------------------------------
+
+
 	CItem* pItem = GetItem(params.itemId);
 	if (!pItem)
 	{
@@ -3419,6 +3501,14 @@ IMPLEMENT_RMI(CActor, SvRequestPickUpItem)
 
 	if (GetHealth() <= 0)
 		return true;
+
+	// Server
+	bool ok = true;
+	if (gServer->GetEvents()->Get("ServerRPC.Callbacks.CanPickupWeapon", ok, ScriptHandle(GetEntityId()), ScriptHandle(params.itemId)) && !ok) {
+		return true;
+	}
+	// ...
+
 	/*
 		// probably should check for ownerId==clientChannelOwnerId
 		IActor *pChannelActor=m_pGameFramework->GetIActorSystem()->GetActorByChannelId(m_pGameFramework->GetGameChannelId(pNetChannel));
@@ -3434,6 +3524,34 @@ IMPLEMENT_RMI(CActor, SvRequestPickUpItem)
 //------------------------------------------------------------------------
 IMPLEMENT_RMI(CActor, SvRequestUseItem)
 {
+	// ---------------------------------------
+	// Server
+	uint16 pChannelId = m_pGameFramework->GetGameChannelId(pNetChannel);
+	if (!pChannelId) {
+		return false;
+	}
+
+	CActor* pNetActor = GetActorByChannel(pChannelId);
+	if (!pNetActor) {
+		return false;
+	}
+
+	EntityId pNetId = pNetActor->GetEntityId();
+	EntityId pActorId = GetEntityId();
+	if (pActorId != pNetId) {
+		gServer->GetEvents()->Call("ServerRPC.Callbacks.OnCheat", pChannelId, "RMI Spoof (SvRequestUseItem)", ScriptHandle(GetEntityId()), ScriptHandle(params.itemId));
+		return false;
+	}
+
+	// Server
+	bool ok = true;
+	if (gServer->GetEvents()->Get("ServerRPC.Callbacks.CanUseWeapon", ok, ScriptHandle(GetEntityId()), ScriptHandle(params.itemId)) && !ok) {
+		return true;
+	}
+
+	// ...
+	// ---------------------------------------
+
 	if (!IsFrozen())
 		UseItem(params.itemId);
 
