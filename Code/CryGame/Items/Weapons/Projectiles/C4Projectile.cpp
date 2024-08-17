@@ -47,6 +47,38 @@ CC4Projectile::~CC4Projectile()
 //------------------------------------------
 void CC4Projectile::HandleEvent(const SGameObjectEvent& event)
 {
+	/*
+	if (m_stuck && m_parentEntity)
+	{
+		if (IEntity* pParent = gEnv->pEntitySystem->GetEntity(m_parentEntity)) {
+
+			CryLogAlways("dynamic update..");
+
+			Vec3 newPos = pParent->GetWorldPos();
+			newPos.z = newPos.z + m_offSetZ;
+
+			Matrix34 ptm = GetEntity()->GetWorldTM();
+			ptm.SetTranslation(newPos);
+			GetEntity()->SetWorldTM(ptm);
+
+			CryLogAlways("\tx=%f,y=%f,z=%f",
+
+				ptm.GetTranslation().x,
+
+				ptm.GetTranslation().y,
+
+				ptm.GetTranslation().z
+			);
+
+			//tests..
+			//GetGameObject()->SetAspectProfile(eEA_Physics, ePT_StuckToEntity);
+			//GetGameObject()->SetAspectProfile(eEA_Physics, ePT_StuckToEntity);
+		}
+		else CryLogAlways("no entity");
+	}
+	else CryLogAlways("bad");
+	*/
+
 	if (m_destroying)
 		return;
 
@@ -186,24 +218,52 @@ void CC4Projectile::Stick(EventPhysCollision* pCollision)
 			//Not in MP
 			if (pActor && gEnv->bMultiplayer)
 			{
-				m_notStick = true;
-				return;
+				// Server
+				if (g_pServerCVars->server_c4_stickToPlayers <= 0) {
+					m_notStick = true;
+					return;
+				}
 			}
 
 			if (pActor && pActor->GetHealth() > 0)
 			{
-				if (pActor->GetActorSpecies() != eGCT_HUMAN)
-				{
-					m_notStick = true;
-					return;
+				// Server
+				if (g_pServerCVars->server_c4_stickToAllSpecies <= 0) {
+					if (pActor->GetActorSpecies() != eGCT_HUMAN)
+					{
+						m_notStick = true;
+						return;
+					}
 				}
 
+				/*
 				if (StickToCharacter(true, pTargetEntity))
 				{
-					GetGameObject()->SetAspectProfile(eEA_Physics, ePT_None);
+					//GetGameObject()->SetAspectProfile(eEA_Physics, ePT_None); //original
+					m_parentEntity = pTargetEntity->GetId(); // test
+					GetGameObject()->SetAspectProfile(eEA_Physics, ePT_StuckToEntity); //test
 					m_stuck = true;
-				}
-				m_notStick = true;
+				}*/
+
+				// -----------------------------------------------------------
+				// Stick to players..
+				Matrix34 mat = pTargetEntity->GetWorldTM();
+				mat.Invert();
+				Matrix33 rotMat = Matrix33::CreateOrientation(mat.TransformVector(-pCollision->n), GetEntity()->GetWorldTM().TransformVector(Vec3(0, 0, 1)), g_PI);
+				m_localChildPos = mat.TransformPoint(pCollision->pt);
+				m_localChildRot = Quat(rotMat);
+
+				mat.SetIdentity();
+				mat.SetRotation33(rotMat);
+				mat.SetTranslation(m_localChildPos);
+				
+				StickToEntity(pActor->GetEntity(), mat);
+				//Dephysicalize and stick
+				m_parentEntity = pActor->GetEntityId();
+				GetGameObject()->SetAspectProfile(eEA_Physics, ePT_StuckToEntity);
+				m_stuck = true;
+				// -----------------------------------------------------------
+				
 				return;
 			}
 
@@ -324,14 +384,21 @@ bool CC4Projectile::StickToCharacter(bool stick, IEntity* pActor)
 	Vec3 c4ToChar = pActor->GetWorldPos() - GetEntity()->GetWorldPos();
 	c4ToChar.Normalize();
 
+	m_offSetZ = (pActor->GetWorldPos().z - GetEntity()->GetWorldPos().z);
+
 	//if(c4ToChar.Dot(charOrientation)>0.0f)
 		//pAttachment = pAttachmentManager->GetInterfaceByName("c4_back");
 	//else
-	pAttachment = pAttachmentManager->GetInterfaceByName("c4_front");
+	pAttachment = pAttachmentManager->GetInterfaceByName("upper_body");
+	//if (!pAttachment)
+	//	pAttachment = pAttachmentManager->GetInterfaceByName("upper_body");
 
 	if (!pAttachment)
 	{
-		CryLogWarning("No c4 face attachment found in actor");
+		CryLogAlways("No c4 face attachment found in actor");
+
+
+		pAttachment = pAttachmentManager->GetInterfaceByName("upper_body");
 		if (!pAttachment)
 			return false;
 	}
@@ -340,7 +407,8 @@ bool CC4Projectile::StickToCharacter(bool stick, IEntity* pActor)
 	{
 		//Check if there's already one
 		if (IAttachmentObject* pAO = pAttachment->GetIAttachmentObject())
-			return false;
+			if (g_pServerCVars->server_c4_stickLimitOne > 0)
+				return false;
 
 		CEntityAttachment* pEntityAttachment = new CEntityAttachment();
 		pEntityAttachment->SetEntityId(GetEntityId());

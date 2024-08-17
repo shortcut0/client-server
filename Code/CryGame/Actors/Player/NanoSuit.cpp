@@ -621,7 +621,7 @@ void CNanoSuit::SetSuitEnergy(float value, bool playerInitiated /* = false */)
 		return;
 
 	// Server (God Mode)
-	if (value < m_energy) {
+	if (value < NANOSUIT_ENERGY) {
 		if (m_pOwner->m_godMode > 0)
 			value = NANOSUIT_ENERGY;
 	} // ...

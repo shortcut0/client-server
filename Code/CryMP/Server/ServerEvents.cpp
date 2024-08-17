@@ -185,6 +185,7 @@ void ServerEvents::OnReadyToFire(IWeapon* pWeapon) {
 
 void ServerEvents::OnPickedUp(IWeapon* pWeapon, EntityId actorId, bool destroyed) {
 
+	/*
 	IScriptTable* pWeaponTbl = 0;
 	IScriptTable* pActorTbl = 0;
 	const char* sAmmoClass = "";
@@ -196,8 +197,8 @@ void ServerEvents::OnPickedUp(IWeapon* pWeapon, EntityId actorId, bool destroyed
 	IEntity* pShooter = gEnv->pEntitySystem->GetEntity(actorId);
 	if (pShooter)
 		pActorTbl = pShooter->GetScriptTable();
-
-	Call("ServerRPC.Callbacks.OnWeaponPickedUp", pWeaponTbl, pActorTbl, destroyed);
+		*/
+	//Call("ServerRPC.Callbacks.OnWeaponPickedUp", pWeaponTbl, pActorTbl, destroyed);
 }
 
 

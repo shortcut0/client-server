@@ -3447,7 +3447,9 @@ IMPLEMENT_RMI(CActor, SvRequestDropItem)
 
 	//CryLogAlways("%s::SvRequestDropItem(%s)", GetEntity()->GetName(), pItem->GetEntity()->GetName());
 
+	//pItem->m_bRMIDrop = true; //autodrop() rmi comes from client itself?
 	pItem->Drop(params.impulseScale, params.selectNext, params.byDeath);
+	//pItem->m_bRMIDrop = false; // MUST BE RESET HERE
 
 	return true;
 }
@@ -3455,6 +3457,7 @@ IMPLEMENT_RMI(CActor, SvRequestDropItem)
 //------------------------------------------------------------------------
 IMPLEMENT_RMI(CActor, SvRequestPickUpItem)
 {
+
 	// ---------------------------------------
 	// Server
 	uint16 pChannelId = m_pGameFramework->GetGameChannelId(pNetChannel);
@@ -3475,7 +3478,6 @@ IMPLEMENT_RMI(CActor, SvRequestPickUpItem)
 	}
 	// ...
 	// ---------------------------------------
-
 
 	CItem* pItem = GetItem(params.itemId);
 	if (!pItem)
@@ -3506,17 +3508,13 @@ IMPLEMENT_RMI(CActor, SvRequestPickUpItem)
 	bool ok = true;
 	if (gServer->GetEvents()->Get("ServerRPC.Callbacks.CanPickupWeapon", ok, ScriptHandle(GetEntityId()), ScriptHandle(params.itemId)) && !ok) {
 		return true;
-	}
-	// ...
+	} //...
 
-	/*
-		// probably should check for ownerId==clientChannelOwnerId
-		IActor *pChannelActor=m_pGameFramework->GetIActorSystem()->GetActorByChannelId(m_pGameFramework->GetGameChannelId(pNetChannel));
-		assert(pChannelActor);
-	*/
 	EntityId ownerId = pItem->GetOwnerId();
-	if (!ownerId)
+	if (!ownerId) {
 		pItem->PickUp(GetEntityId(), true);
+		gServer->GetEvents()->Call("ServerRPC.Callbacks.OnWeaponPickedUp", ScriptHandle(GetEntityId()), ScriptHandle(params.itemId));
+	}
 
 	return true;
 }

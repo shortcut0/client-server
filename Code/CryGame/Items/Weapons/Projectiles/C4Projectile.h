@@ -47,6 +47,9 @@ private:
 	
 	virtual void SetParams(EntityId ownerId, EntityId hostId, EntityId weaponId, int fmId, int damage, int hitTypeId);
 
+	//Server test
+	float m_offSetZ;
+
 	int				m_teamId;
 	bool			m_stuck;
 	bool      m_notStick;

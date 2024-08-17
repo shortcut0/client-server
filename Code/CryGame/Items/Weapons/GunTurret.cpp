@@ -29,6 +29,8 @@ History:
 #include "Projectile.h"
 #include "CryGame/Actors/Player/Player.h"
 
+// Server
+#include "CryMP/Server/ServerCVars.h"
 
 namespace
 {
@@ -593,6 +595,11 @@ bool CGunTurret::IsTargetHostile(IActor* pTarget) const
 	int team = g_pGame->GetGameRules()->GetTeam(pTarget->GetEntityId());
 	bool sameTeam = (m_turretparams.team == 0) || (team == 0) || (m_turretparams.team == team);
 
+	
+	if (CActor* pActor = GetActor(pTarget->GetEntityId()))
+		if (pActor->m_godMode >= 1)
+			return false;
+
 	return !sameSpecies || !sameTeam;
 
 	/*	IVehicle *pVehicle=g_pGame->GetIGameFramework()->GetIVehicleSystem()->GetVehicle(pTarget->GetId());
@@ -628,6 +635,9 @@ bool CGunTurret::IsTACBullet(IEntity* pTarget) const
 {
 	const static IEntityClass* pTacClass = gEnv->pEntitySystem->GetClassRegistry()->FindClass("tacprojectile");
 	const static IEntityClass* pTacGunClass = gEnv->pEntitySystem->GetClassRegistry()->FindClass("tacgunprojectile");
+
+	//TODO
+	const static IEntityClass* pRPGClass = gEnv->pEntitySystem->GetClassRegistry()->FindClass("rocket");
 
 	if (pTarget->GetClass() != pTacClass && pTarget->GetClass() != pTacGunClass)
 		return false;
@@ -673,7 +683,8 @@ CGunTurret::ETargetClass CGunTurret::GetTargetClass(IEntity* pTarget)const
 		return eTC_Vehicle;
 
 	if (IsTargetCloaked(pActor))
-		return eTC_NotATarget;
+		if (g_pServerCVars->server_turrets_target_cloaked <= 0)
+			return eTC_NotATarget;
 
 	return eTC_Player;
 }

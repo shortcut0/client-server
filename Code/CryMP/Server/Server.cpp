@@ -15,6 +15,10 @@
 #include "CryCommon/CrySystem/ISystem.h"
 #include "CryGame/Game.h"
 
+#include "CryCommon/CryAction/IVehicleSystem.h"
+#include "CryCommon/CryAction/IItemSystem.h"
+#include "CryGame/Items/Weapons/WeaponSystem.h"
+
 #include "Server.h"
 #include "ServerLog.h"
 #include "ServerCVars.h"
@@ -32,6 +36,7 @@
 #include <string>
 
 // Exit handler
+#include "QuitHook.h"
 #include <cstdlib>  // For std::atexit
 
 // ----------
@@ -68,7 +73,8 @@ void Server::Init(IGameFramework* pGameFramework)
 	
 	// --------------------------------------
 	Log("Setting atexit callback..");
-	std::atexit(m_pExitHandler);
+	QuitHook::Init();
+	//std::atexit(m_pExitHandler);
 
 	// --------------------------------------
 	IConsole* pConsole = gEnv->pConsole;
@@ -109,6 +115,12 @@ void Server::Init(IGameFramework* pGameFramework)
 	pEntitySystem->AddSink(this);
 
 	// -----------
+	if (!m_pSS->ExecuteFile(std::string(m_rootDir.string() + "\\Scripts\\EarlyInit.lua").c_str()))
+		Log("Failed to load EarlyInit.lua");
+	else
+		Log("EarlyInit.lua loaded..");
+
+	// -----------
 	g_pGame = new CGame();
 	g_pGame->Init(pGameFramework);
 
@@ -146,7 +158,7 @@ void Server::UpdateLoop()
 {
 
 	std::string cfg ("CryMP-Server\\Config\\Init.cfg");
-	if (WinAPI::CmdLine::HasArg("-dedicated"))
+	if (WinAPI::CmdLine::HasArg("-headless"))
 		cfg = "CryMP-Server\\Config\\Init-Headless.cfg";
 
 	ReadCfg(cfg);
@@ -486,8 +498,12 @@ void Server::OnLoadingStart(ILevelInfo* pLevel)
 // -------------------------------------
 void Server::OnLoadingComplete(ILevel* pLevel)
 {
-	if (m_pSS)
+	if (m_pSS) {
 		m_pSS->SetGlobalValue("MAP_START_TIME", gEnv->pTimer->GetCurrTime());
+		if (IsLuaReady()) {
+			GetEvents()->Call("ServerRPC.Callbacks.OnMapStarted");
+		}
+	}
 
 	InitLua();
 }
@@ -536,6 +552,109 @@ bool Server::OnBeforeSpawn(SEntitySpawnParams& params)
 			}
 		}
 	}
+	else if (IsLuaReady()) {
+
+		// not needed rn
+		/*
+		bool filterok = false;
+		if (IEntityClass* pClass = params.pClass)
+		{
+
+			if (IGameFramework* pF = gEnv->pGame->GetIGameFramework()) {
+
+				if (pF->GetIVehicleSystem()->IsVehicleClass(pClass->GetName()))
+					filterok = true;
+
+				const char* sClass = pClass->GetName();
+				if (!filterok && (
+					//strcmp(sClass, "Player") == 0 ||
+					//strcmp(sClass, "Grunt") == 0 ||
+					strcmp(sClass, "end") == 0
+					//add more here!
+					)) filterok = true;
+			}
+
+		}
+
+		if (!filterok)
+			return true;
+
+		SmartScriptTable chain(m_pSS);
+		SmartScriptTable spawnparams = m_pSS->CreateTable();
+
+		// sends table 1 in and retrives new properties from table 2
+
+		spawnparams->SetValue("id", params.id ? ScriptHandle(params.id) : 0);
+		spawnparams->SetValue("position", params.vPosition ? params.vPosition : Vec3(0, 0, 0));
+		spawnparams->SetValue("direction", Vec3(params.qRotation.GetFwdX(), params.qRotation.GetFwdY(), params.qRotation.GetFwdZ()));
+		spawnparams->SetValue("class", params.pClass ? params.pClass->GetName() : "");
+		spawnparams->SetValue("scale", params.vScale ? params.vScale : Vec3(0, 0, 0));
+		spawnparams->SetValue("flags", params.nFlags ? params.nFlags : 0);
+
+		//if (params.pPropertiesInstanceTable) {
+			spawnparams->SetValue("propertiesInstance", params.pPropertiesInstanceTable);
+			spawnparams->SetValue("properties", params.pPropertiesTable);
+		//}
+
+		//if (params.pPropertiesTable) {
+			
+		//}
+
+		if (!GetEvents()->Get("ServerRPC.Callbacks.OnBeforeSpawn", chain, spawnparams))
+			return true;
+
+
+		bool cancel = false;
+		if (chain->GetValue("abort", cancel) && cancel == true)
+			return false;
+
+		const char* entityClass = nullptr;
+		const char* entityName = "";
+		const char* archetypeName = nullptr;
+		ScriptHandle entityId;
+		IScriptTable *propsTable = m_pSS->CreateTable();
+		IScriptTable* propsInstanceTable = m_pSS->CreateTable();
+
+		Vec3 pos(0.0f, 0.0f, 0.0f);
+		Vec3 dir(1.0f, 0.0f, 0.0f);
+		Vec3 scale(1.0f, 1.0f, 1.0f);
+		int flags = 0;
+
+		bool props = false;
+		bool propsInstance = false;
+
+		if (chain->GetValue("id", entityId))
+			params.id = (EntityId)entityId.n;
+
+		if (chain->GetValue("class", entityClass))
+			params.pClass = gEnv->pEntitySystem->GetClassRegistry()->FindClass(entityClass);
+
+		if (chain->GetValue("name", entityName))
+			params.sName = entityName;
+
+		if (chain->GetValue("position", pos))
+			params.vPosition = pos;
+
+		if (chain->GetValue("orientation", dir))
+			params.qRotation = Quat(Matrix33::CreateRotationVDir(dir));
+
+		if (chain->GetValue("scale", scale))
+			params.vScale = scale;
+
+		if (chain->GetValue("flags", flags))
+			params.nFlags = flags;
+
+		props = chain->GetValue("properties", propsTable);
+		propsInstance = chain->GetValue("propertiesInstance", propsInstanceTable);
+
+		if (props) {
+			params.pPropertiesTable = propsTable;
+		}
+
+		if (propsInstance) {
+			params.pPropertiesInstanceTable = propsInstanceTable;
+		}*/
+	}
 
 	return true;
 }
@@ -544,6 +663,7 @@ bool Server::OnBeforeSpawn(SEntitySpawnParams& params)
 void Server::OnSpawn(IEntity* pEntity, SEntitySpawnParams& params)
 {
 	FUNCTION_PROFILER(gEnv->pSystem, PROFILE_GAME);
+
 	m_lastSpawnId = pEntity->GetId();
 }
 

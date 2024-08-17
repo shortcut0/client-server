@@ -45,6 +45,7 @@ public:
 	int GetLevels(IFunctionHandler* pH);
 	int GetEntityClasses(IFunctionHandler* pH);
 	int GetItemClasses(IFunctionHandler* pH);
+	int GetVehicleClasses(IFunctionHandler* pH);
 	int IsValidEntityClass(IFunctionHandler* pH, const char* name);
 	int IsValidItemClass(IFunctionHandler* pH, const char* name);
 

@@ -59,6 +59,23 @@ void ServerCVars::InitCVars(IConsole* pConsole)
 	pConsole->Register("server_use_hit_queue", &server_use_hit_queue, 0, 0, "Enable/Disable the hit queue");
 	pConsole->Register("server_use_explosion_queue", &server_use_explosion_queue, 1, 0, "Enable/Disable the explosion queue");
 	pConsole->Register("server_classic_chat", &server_classic_chat, 0, 0, "Enable/Disable the default chat system");
+	pConsole->Register("server_turrets_target_cloaked", &server_turrets_target_cloaked, 0, 0, "Enable/Disable turrets targetting cloaked players");
+	pConsole->Register("server_autodrop_rpg", &server_autodrop_rpg, 0, 0, "Enable/Disable automatically dropping RPGs");
+	pConsole->Register("server_c4_limit", &server_c4_limit, 30, 0, "Enable/Disable automatically dropping RPGs");
+	pConsole->Register("server_allow_c4Hits", &server_allow_c4Hits, 1, 0, "Enable/Disable automatically dropping RPGs");
+	pConsole->Register("server_c4_stickToPlayers", &server_c4_stickToPlayers, 1, 0, "Enable/Disable automatically dropping RPGs");
+	pConsole->Register("server_c4_stickToAllSpecies", &server_c4_stickToAllSpecies, 1, 0, "Enable/Disable automatically dropping RPGs");
+	pConsole->Register("server_c4_stickLimitOne", &server_c4_stickLimitOne, 0, 0, "Enable/Disable automatically dropping RPGs");
+	
+	// Suit Mode
+	pConsole->Register("server_suit_cloakMeleeEnergyCost", &server_suit_cloakMeleeEnergyCost, 20, 0, "Energy cost when performing a melee attack while using cloak mode");
+	pConsole->Register("server_suit_cloakShootingEnergyCost", &server_suit_cloakShootingEnergyCost, 20, 0, "Energy cost when firing a weapon while using cloak mode");
+
+	pConsole->Register("server_suit_speedMeleeEnergyCost", &server_suit_speedMeleeEnergyCost, 25, 0, "Energy cost when performing a melee attack while using cloak mode");
+	pConsole->Register("server_suit_speedShootingEnergyCost", &server_suit_speedShootingEnergyCost, 25, 0, "Energy cost when firing a weapon while using speed mode");
+
+	pConsole->Register("server_suit_strengthMeleeEnergyCost", &server_suit_strengthMeleeEnergyCost, 35, 0, "Energy cost when performing a melee attack while using cloak mode");
+	pConsole->Register("server_suit_strengthShootingEnergyCost", &server_suit_strengthShootingEnergyCost, 35, 0, "Energy cost when firing a weapon while using strength mode");
 
 	// Lag Fix
 	pConsole->Register("server_lag_resetmovement", &server_lag_resetmovement, 0, 0, "Enables/Disables Resetting movement on network lag");

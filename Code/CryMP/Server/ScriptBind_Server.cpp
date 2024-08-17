@@ -78,6 +78,7 @@ ScriptBind_Server::ScriptBind_Server()
 	SCRIPT_REG_TEMPLFUNC(IsValidItemClass, "class");   // Returns true if specified entity class is valid (exists)
 	SCRIPT_REG_FUNC(GetEntityClasses);   // Returns true if specified entity class is valid (exists)
 	SCRIPT_REG_FUNC(GetItemClasses);   // Returns true if specified entity class is valid (exists)
+	SCRIPT_REG_FUNC(GetVehicleClasses);   // Returns true if specified entity class is valid (exists)
 
 	// Network
 	SCRIPT_REG_TEMPLFUNC(Request, "params, callback");
@@ -151,6 +152,7 @@ int ScriptBind_Server::GetItemClasses(IFunctionHandler* pH) {
 	if (!pItemSystem)
 		return pH->EndFunction();
 
+
 	IEntityClassRegistry* pEntityRegistry = gEnv->pEntitySystem->GetClassRegistry();
 	if (!pEntityRegistry)
 		return pH->EndFunction();
@@ -159,6 +161,35 @@ int ScriptBind_Server::GetItemClasses(IFunctionHandler* pH) {
 	{
 		if (pClass != NULL) {
 			if (pItemSystem->IsItemClass(pClass->GetName()))
+				pClasses->PushBack(pClass->GetName());
+
+		}
+	}
+
+	return pH->EndFunction(pClasses);
+}
+
+
+// --------------------------------------------------------------------------------
+// Describe this
+int ScriptBind_Server::GetVehicleClasses(IFunctionHandler* pH) {
+
+	SmartScriptTable pClasses = gEnv->pScriptSystem->CreateTable();
+	IEntityClass* pClass = NULL;
+
+	IVehicleSystem* pVehicleSystem = gEnv->pGame->GetIGameFramework()->GetIVehicleSystem();
+	if (!pVehicleSystem)
+		return pH->EndFunction();
+
+
+	IEntityClassRegistry* pEntityRegistry = gEnv->pEntitySystem->GetClassRegistry();
+	if (!pEntityRegistry)
+		return pH->EndFunction();
+
+	for (pEntityRegistry->IteratorMoveFirst(); pClass = pEntityRegistry->IteratorNext();)
+	{
+		if (pClass != NULL) {
+			if (pVehicleSystem->IsVehicleClass(pClass->GetName()))
 				pClasses->PushBack(pClass->GetName());
 
 		}

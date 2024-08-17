@@ -13,6 +13,19 @@ struct ServerCVars {
 	int server_classic_chat;
 	int server_lag_resetmovement;
 	int server_ghostbug_fix;
+	int server_turrets_target_cloaked;
+	int server_autodrop_rpg;
+	int server_suit_cloakMeleeEnergyCost;
+	int server_suit_cloakShootingEnergyCost;
+	int server_suit_speedShootingEnergyCost;
+	int server_suit_strengthShootingEnergyCost;
+	int server_suit_strengthMeleeEnergyCost;
+	int server_suit_speedMeleeEnergyCost;
+	int server_c4_limit;
+	int server_allow_c4Hits;
+	int server_c4_stickToPlayers;
+	int server_c4_stickToAllSpecies;
+	int server_c4_stickLimitOne;
 
 	// Commands
 	ICVar *server_mapTitle;

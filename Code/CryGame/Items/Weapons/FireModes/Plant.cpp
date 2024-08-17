@@ -19,6 +19,8 @@ History:
 #include "CryGame/Game.h"
 #include "../C4.h"
 
+// Server
+#include "CryMP/Server/Server.h"
 
 IEntityClass* CPlant::m_pAVMineClass = NULL;
 IEntityClass* CPlant::m_pClaymoreClass = NULL;

@@ -44,7 +44,7 @@ CScriptBind_Actor::CScriptBind_Actor(ISystem* pSystem)
 #define SCRIPT_REG_CLASSNAME &CScriptBind_Actor::
 
 	// Server
-	// SCRIPT_REG_FUNC(GetVehicleViewDir);
+	//SCRIPT_REG_FUNC(GetVehicleViewDir);
 
 	SCRIPT_REG_FUNC(DumpActorInfo);
 	SCRIPT_REG_FUNC(SetViewAngleOffset);
@@ -163,6 +163,7 @@ CScriptBind_Actor::CScriptBind_Actor(ISystem* pSystem)
 	SCRIPT_REG_TEMPLFUNC(GetLookAtPoint, "");
 
 	//Server:
+	SCRIPT_REG_FUNC(GetVehicleViewDir);
 	SCRIPT_REG_FUNC(GetRotation);
 	SCRIPT_REG_TEMPLFUNC(SetGodMode, "mode");
 	SCRIPT_REG_TEMPLFUNC(SetActorMode, "mode, value");
@@ -264,6 +265,19 @@ int CScriptBind_Actor::SetGodMode(IFunctionHandler* pH, int mode)
 
 	pActor->m_godMode = mode;
 	return pH->EndFunction();
+}
+
+
+//------------------------------------------------------------------------
+// SERVER
+int CScriptBind_Actor::GetVehicleViewDir(IFunctionHandler* pH)
+{
+	CActor* pActor = GetActor(pH);
+	if (!pActor)
+		return pH->EndFunction();
+
+	Vec3 dir = ((CPlayer*)pActor)->GetVehicleViewDir();
+	return pH->EndFunction(dir);
 }
 
 

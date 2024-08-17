@@ -453,13 +453,20 @@ IMPLEMENT_RMI(CWeapon, SvRequestShoot)
 		if (!isLocal)
 			NetShoot(params.hit, params.predictionHandle);
 
+		// ac
+		// m_shotsFired++; //reset onreloadend
+
 		if (pActor && !isLocal && params.seq)
 		{
-			if (CGameRules *pGameRules=g_pGame->GetGameRules())
-				pGameRules->ValidateShot(pActor->GetEntityId(), GetEntityId(), params.seq, params.seqr);
+			//if (CGameRules *pGameRules=g_pGame->GetGameRules())
+			//	pGameRules->ValidateShot(pActor->GetEntityId(), GetEntityId(), params.seq, params.seqr);
 		}
 
 		gServer->GetEvents()->Call("ServerRPC.Callbacks.OnShoot", pActor->GetEntity()->GetScriptTable(), GetEntity()->GetScriptTable(), params.pos, params.hit, params.dir);
+		
+		// TODO: AC
+		//if (!gServer->GetAC()->CheckLongpoke(pActor, params.seq))
+		//	return false;
 	}
 
 	return true;
@@ -492,12 +499,14 @@ IMPLEMENT_RMI(CWeapon, SvRequestShootEx)
 		if (!isLocal)
 			NetShootEx(params.pos, params.dir, params.vel, params.hit, params.extra, params.predictionHandle);
 
-		if (pActor && !isLocal && params.seq)
-		{
-			if (CGameRules *pGameRules=g_pGame->GetGameRules())
-				pGameRules->ValidateShot(pActor->GetEntityId(), GetEntityId(), params.seq, params.seqr);
-		}
+		//CryLogAlways("nc");
+		gServer->GetEvents()->Call("ServerRPC.Callbacks.OnShoot", pActor ? pActor->GetEntity()->GetScriptTable() : 0, GetEntity()->GetScriptTable(), params.pos, params.hit, params.dir);
+
+		// TODO: AC
+		//if (!gServer->GetAC()->CheckLongpoke(pActor, params.seq))
+		//	return false;
 	}
+	//CryLogAlways(">>nc<<");
 
 	return true;
 }

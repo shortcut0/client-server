@@ -916,7 +916,6 @@ public:
 	DECLARE_CLIENT_RMI_NOATTACH_FAST(ClShatterEntity, ShatterEntityParams, eNRT_ReliableOrdered);
 
 	DECLARE_SERVER_RMI_NOATTACH(SvRequestChatMessage, ChatMessageParams, eNRT_ReliableUnordered);
-	DECLARE_CLIENT_RMI_NOATTACH(ClChatMessage, ChatMessageParams, eNRT_ReliableUnordered);
 
 	DECLARE_SERVER_RMI_NOATTACH(SvRequestRadioMessage, RadioMessageParams, eNRT_ReliableUnordered);
 	DECLARE_CLIENT_RMI_NOATTACH(ClRadioMessage, RadioMessageParams, eNRT_ReliableUnordered);
@@ -931,7 +930,19 @@ public:
 	DECLARE_SERVER_RMI_NOATTACH(SvRequestChangeTeam, ChangeTeamParams, eNRT_ReliableOrdered);
 	DECLARE_SERVER_RMI_NOATTACH(SvRequestSpectatorMode, SpectatorModeParams, eNRT_ReliableOrdered);
 	DECLARE_CLIENT_RMI_NOATTACH(ClSetTeam, SetTeamParams, eNRT_ReliableOrdered);
-	DECLARE_CLIENT_RMI_NOATTACH(ClTextMessage, TextMessageParams, eNRT_ReliableUnordered);
+
+
+	//---------------------------------------------------------------------------------------------
+	// Server
+	// use ordered flag to ensure messages wont mix up!
+
+	DECLARE_CLIENT_RMI_NOATTACH(ClChatMessage, ChatMessageParams, eNRT_ReliableOrdered); // is this neccesarry?
+	DECLARE_CLIENT_RMI_NOATTACH(ClTextMessage, TextMessageParams, eNRT_ReliableOrdered);
+	//DECLARE_CLIENT_RMI_NOATTACH(ClChatMessage, ChatMessageParams, eNRT_ReliableUnordered);
+	//DECLARE_CLIENT_RMI_NOATTACH(ClTextMessage, TextMessageParams, eNRT_ReliableUnordered); // old
+
+	//---------------------------------------------------------------------------------------------
+
 
 	DECLARE_CLIENT_RMI_NOATTACH(ClAddSpawnGroup, SpawnGroupParams, eNRT_ReliableOrdered);
 	DECLARE_CLIENT_RMI_NOATTACH(ClRemoveSpawnGroup, SpawnGroupParams, eNRT_ReliableOrdered);

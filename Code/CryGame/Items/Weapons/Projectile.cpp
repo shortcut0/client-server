@@ -29,6 +29,9 @@ History:
 
 #include "CryGame/HUD/HUD.h"
 
+//Server
+#include "CryMP/Server/Server.h"
+
 //------------------------------------------------------------------------
 CProjectile::CProjectile()
 	: m_whizSoundId(INVALID_SOUNDID),
@@ -736,6 +739,14 @@ void CProjectile::SetTracked(bool tracked)
 //------------------------------------------------------------------------
 void CProjectile::Explode(bool destroy, bool impact, const Vec3& pos, const Vec3& normal, const Vec3& vel, EntityId targetId)
 {
+
+	// --------------------------------------------------------
+	// Server
+	bool skip_explosion = false;
+	bool remove_projectile = false;
+	const char* new_effect;
+	// --------------------------------------------------------
+
 	const SExplosionParams* pExplosionParams = m_pAmmoParams->pExplosion;
 	if (pExplosionParams)
 	{
@@ -759,11 +770,49 @@ void CProjectile::Explode(bool destroy, bool impact, const Vec3& pos, const Vec3
 			maxRadius = m_pAmmoParams->pFlashbang->maxRadius;
 		}
 
+		// --------------------------------------------------------
+		// Server
+
+		SmartScriptTable mods(gEnv->pScriptSystem);
+		const char* effectName = pExplosionParams->effectName;
+		bool ignore = false;
+
+		// --------------------------------------------------------
+		IEntity* pWeapon = gEnv->pEntitySystem->GetEntity(m_weaponId);
+		const char* pClass = GetEntity()->GetClass()->GetName();
+		/*CryLogAlways("m_pAmmoParams->bulletType = %d", m_pAmmoParams->bulletType);
+		CryLogAlways("m_pAmmoParams->bulletType = %f", m_pAmmoParams->mass);
+		CryLogAlways("m_pAmmoParams->bulletType = %d", (int)m_pAmmoParams->physicalizationType);
+		CryLogAlways("m_pAmmoParams->bulletType = %s", m_pAmmoParams->fpGeometry ? m_pAmmoParams->fpGeometry->GetFilePath():"n/a");
+		*/
+		IScriptTable* pWeaponLua = NULL;
+
+
+		if (pWeapon || (strcmp(pClass, "scargrenade") || strcmp(pClass, "explosivegrenade") == 0)) {
+
+			if (pWeapon)
+				pWeaponLua = pWeapon->GetScriptTable();
+
+			//CryLogAlways("Checking MODS..");
+			if (gServer->GetEvents()->Get("ServerRPC.Callbacks.OnProjectileExplosion", mods, pWeaponLua, pWeapon ? pWeapon->GetClass()->GetName() : "", ScriptHandle(GetEntityId()), effectName, epos, dir, normal) && mods.GetPtr()) {
+
+				remove_projectile = (mods->GetValue("RemoveProjectile", remove_projectile) && remove_projectile);
+				skip_explosion = (mods->GetValue("SkipExplosion", skip_explosion) && skip_explosion);
+				if (mods->GetValue("Effect", new_effect))
+					effectName = new_effect;
+
+				//CryLogAlways("Mods received..");
+			}
+		}
+
+		// --------------------------------------------------------
+
 		ExplosionInfo explosionInfo(m_ownerId, GetEntityId(), m_damage, epos, dir, minRadius, maxRadius, pExplosionParams->minPhysRadius, pExplosionParams->maxPhysRadius, 0.0f, pExplosionParams->pressure, pExplosionParams->holeSize, pGameRules->GetHitTypeId(pExplosionParams->type.c_str()));
 		if (m_pAmmoParams->pFlashbang)
-			explosionInfo.SetEffect(pExplosionParams->effectName, pExplosionParams->effectScale, pExplosionParams->maxblurdist, m_pAmmoParams->pFlashbang->blindAmount, m_pAmmoParams->pFlashbang->flashbangBaseTime);
+			explosionInfo.SetEffect(effectName, pExplosionParams->effectScale, pExplosionParams->maxblurdist, m_pAmmoParams->pFlashbang->blindAmount, m_pAmmoParams->pFlashbang->flashbangBaseTime);
 		else
-			explosionInfo.SetEffect(pExplosionParams->effectName, pExplosionParams->effectScale, pExplosionParams->maxblurdist);
+			explosionInfo.SetEffect(effectName, pExplosionParams->effectScale, pExplosionParams->maxblurdist);
+		
 		explosionInfo.SetEffectClass(m_pAmmoParams->pEntityClass->GetName());
 
 		if (impact)
@@ -771,7 +820,9 @@ void CProjectile::Explode(bool destroy, bool impact, const Vec3& pos, const Vec3
 
 		if (gEnv->bServer)
 		{
-			pGameRules->ServerExplosion(explosionInfo);
+
+			if (!skip_explosion)
+				pGameRules->ServerExplosion(explosionInfo);
 
 			// add battle dust as well
 			CBattleDust* pBD = pGameRules->GetBattleDust();
@@ -787,7 +838,7 @@ void CProjectile::Explode(bool destroy, bool impact, const Vec3& pos, const Vec3
 			FlashbangEffect(m_pAmmoParams->pFlashbang);
 	}
 
-	if (destroy)
+	if (destroy || remove_projectile)
 		Destroy();
 }
 
@@ -1275,15 +1326,33 @@ float CProjectile::GetSpeed() const
 //==================================================================
 void CProjectile::OnHit(const HitInfo& hit) //server only
 {
-	//C4, special case
-	if (m_noBulletHits)
-		return;
+	IEntityClass* pThisClass = GetEntity()->GetClass();
+
+	// add more if needed..
+	const static IEntityClass* pClayClass = gEnv->pEntitySystem->GetClassRegistry()->FindClass("claymoreexplosive");
+	const static IEntityClass* pC4Class = gEnv->pEntitySystem->GetClassRegistry()->FindClass("c4explosive");
+	const static IEntityClass* pAVClass = gEnv->pEntitySystem->GetClassRegistry()->FindClass("avexplosive");
+
+	// Server - changed to allow c4s to explode on hit
+	if (m_noBulletHits) 
+	{
+		bool isC4 = (pThisClass == pC4Class);
+		if (!isC4)
+			return;
+
+		// C4, check cvar now
+		if (g_pServerCVars->server_allow_c4Hits <= 0)
+			return;
+	}
+
+	// Events..
+	if (hit.shooterId && (pClayClass == pThisClass || pClayClass == pC4Class || pClayClass == pAVClass))
+		gServer->GetEvents()->Call("ServerRPC.Callbacks.OnProjectileHit", ScriptHandle(hit.shooterId), ScriptHandle(GetEntityId()), hit.damage, ScriptHandle(hit.weaponId), hit.pos, hit.normal);
 
 	//Reduce hit points if hit, and explode (only for C4, AVMine and ClayMore)
 	if (hit.targetId == GetEntityId() && m_hitPoints > 0 && !m_destroying)
 	{
 		m_hitPoints -= (int)hit.damage;
-
 		if (m_hitPoints <= 0)
 			Explode(true);
 	}

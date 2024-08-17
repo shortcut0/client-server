@@ -20,6 +20,7 @@
 
 // Server
 #include "ServerStats.h"
+#include "AntiCheat.h"
 
 #include "ServerCVars.h"
 #include "ServerUtils.h"
@@ -48,7 +49,7 @@ enum class EGameSpyUpdateType {
 class Server : public IGameFrameworkListener, public ILevelSystemListener, public IEntitySystemSink
 {
 	// ------------------------------
-	static void m_pExitHandler();;
+	static void m_pExitHandler();
 
 	// ------------------------------
 	IGameFramework* m_pGameFramework = nullptr;
@@ -63,6 +64,7 @@ class Server : public IGameFrameworkListener, public ILevelSystemListener, publi
 	std::unique_ptr<LuaFileSystem> m_pLuaFileSystem;
 	std::unique_ptr<ServerUtils> m_pServerUtils;
 	std::unique_ptr<ServerStats> m_pServerStats;
+	std::unique_ptr<ServerAnticheat> m_pAC;
 
 	// ------------------------------
 
@@ -102,6 +104,9 @@ public:
 	// ------------------------------
 	Server();
 	~Server();
+
+	// ---------------------------------
+	void Quit() { m_pExitHandler(); };
 
 	// ---------------------------------
 	// Overwrites input script path 
@@ -146,6 +151,11 @@ public:
 	ServerUtils* GetUtils()
 	{
 		return m_pServerUtils.get();
+	}
+
+	ServerAnticheat* GetAC()
+	{
+		return m_pAC.get();
 	}
 
 	ServerStats* GetStats()

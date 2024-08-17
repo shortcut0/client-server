@@ -76,7 +76,7 @@ void CWeapon::OnShoot(EntityId shooterId, EntityId ammoId, IEntityClass* pAmmoTy
 				if (pSuit->GetMode() == NANOMODE_STRENGTH && !IsMounted())
 					pSuit->SetSuitEnergy(pSuit->GetSuitEnergy()-g_pGameCVars->g_suitRecoilEnergyCost);
 				else if(pSuit->GetMode() == NANOMODE_CLOAK)
-					pSuit->SetSuitEnergy(0.0f);
+					pSuit->SetSuitEnergy(pSuit->GetSuitEnergy() - g_pServerCVars->server_suit_cloakShootingEnergyCost);
 			}
 		}
 
@@ -273,14 +273,14 @@ void CWeapon::OnMelee(EntityId shooterId)
 				if (curMode == NANOMODE_SPEED)
 				{
 					if (gEnv->bServer)
-						pSuit->SetSuitEnergy(pSuit->GetSuitEnergy()-15.0f);
+						pSuit->SetSuitEnergy(pSuit->GetSuitEnergy()- g_pServerCVars->server_suit_speedMeleeEnergyCost);
 				}
 				else if (curMode == NANOMODE_STRENGTH)
 				{
 					if (gEnv->bServer)
 					{
 						if(gEnv->bMultiplayer)
-							pSuit->SetSuitEnergy(pSuit->GetSuitEnergy()-40.0f);
+							pSuit->SetSuitEnergy(pSuit->GetSuitEnergy()- g_pServerCVars->server_suit_strengthMeleeEnergyCost);
 						else
 							pSuit->SetSuitEnergy(pSuit->GetSuitEnergy()-20.0f);
 					}
@@ -289,7 +289,7 @@ void CWeapon::OnMelee(EntityId shooterId)
 				else if (curMode == NANOMODE_CLOAK)
 				{
 					if (gEnv->bServer)
-						pSuit->SetSuitEnergy(0.0f);
+						pSuit->SetSuitEnergy(pSuit->GetSuitEnergy() - g_pServerCVars->server_suit_cloakMeleeEnergyCost);
 				}
 
 				if (gEnv->bServer && pSuit->IsInvulnerable())

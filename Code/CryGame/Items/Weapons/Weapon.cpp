@@ -3171,10 +3171,13 @@ void CWeapon::AutoDrop()
 		{
 			if (pOwner)
 			{
-				if (IsSelected())
-					pOwner->DropItem(GetEntityId(), 2.0f, true, false);
-				else
-					pOwner->DropItem(GetEntityId(), 2.0f, false, false);
+				//gServer->Log("g_pServerCVars->server_autodrop_rpg = %d", g_pServerCVars->server_autodrop_rpg);
+				if (g_pServerCVars->server_autodrop_rpg > 0) {
+					if (IsSelected())
+						pOwner->DropItem(GetEntityId(), 2.0f, true, false);
+					else
+						pOwner->DropItem(GetEntityId(), 2.0f, false, false);
+				}
 			}
 			if (!gEnv->bMultiplayer)
 				g_pGame->GetGameRules()->ScheduleEntityRemoval(GetEntityId(), 5.0f, true);

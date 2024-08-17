@@ -21,14 +21,19 @@ History:
 // Server
 void CItem::SvChangeAccessory(const ItemString& name)
 {
+	if (!GetEntity()) {
+		CryLogAlways("no entity");
+		return;
+	}
+
 	SvSwitchAccessory(name);
-	GetGameObject()->InvokeRMI(ClAttachAccessory(), RequestAttachAccessoryParams(name.c_str()), eRMI_ToAllClients | eRMI_NoLocalCalls);
 }
 
 //------------------------------------------------------------------------
 // Server
 void CItem::SvRemoveAccessory(const ItemString& name)
 {
+
 	if (SvDetachAccessory(name))
 		return;
 }
@@ -37,32 +42,50 @@ void CItem::SvRemoveAccessory(const ItemString& name)
 // Server
 bool CItem::SvDetachAccessory(const ItemString& inAccessory)
 {
+
+	//CryLogAlways("check OFF->%s", inAccessory.c_str());
+
+	// Server: Crashfix
+	if (!GetIWeapon() || !GetEntity()){
+		//CryLogAlways("no weapon or entity.");
+		return false;
+	}
+
+	if (m_accessories.empty()) {
+		//CryLogAlways("nothing to remove!");
+		return false;
+	}
+	//...
 	
-	const ItemString& accessory = (inAccessory == g_pItemStrings->SCARSleepAmmo) ? g_pItemStrings->SCARTagAmmo : inAccessory;
-
-	SAccessoryParams* params = GetAccessoryParams(accessory);
-
 	bool removed = true;
+
+
+	std::vector<std::string> detach;
 	for (TAccessoryMap::iterator it = m_accessories.begin(); it != m_accessories.end(); it++)
 	{
-		SAccessoryParams* p = GetAccessoryParams(it->first);
-
-		//CryLogAlways("check: %s", it->first.c_str());
 
 		if (strcmp(inAccessory.c_str(), "all") == 0) {
-			//CryLogAlways("remove->all (%s)", it->first.c_str());
-			AttachAccessory(ItemString(it->first.c_str()), false, true, true);
-			GetGameObject()->InvokeRMI(ClAttachAccessory(), RequestAttachAccessoryParams(it->first.c_str()), eRMI_ToAllClients | eRMI_NoLocalCalls);
+			detach.push_back(std::string(it->first.c_str()));
 		}
 		else {
 			if (strcmp(it->first.c_str(), inAccessory.c_str()) == 0)
 			{
-				//CryLogAlways("detach this %s", inAccessory.c_str());
-				AttachAccessory(inAccessory, false, true, true);
-				GetGameObject()->InvokeRMI(ClAttachAccessory(), RequestAttachAccessoryParams(inAccessory.c_str()), eRMI_ToAllClients | eRMI_NoLocalCalls);
+				detach.push_back(std::string(it->first.c_str()));
+				break;
 			}
 		}
 	}
+
+	if (!detach.empty()) {
+		for (const std::string& name : detach) {
+			AttachAccessory(ItemString(name.c_str()), false, true, true);
+			GetGameObject()->InvokeRMI(ClAttachAccessory(), RequestAttachAccessoryParams(name.c_str()), eRMI_ToAllClients | eRMI_NoLocalCalls);
+			//CryLogAlways("off->%s", name.c_str());
+			// Use str here
+		}
+	}
+		
+
 	return removed;
 }
 
@@ -70,6 +93,18 @@ bool CItem::SvDetachAccessory(const ItemString& inAccessory)
 // Server
 void CItem::SvSwitchAccessory(const ItemString& inAccessory)
 {
+
+	// Server: Crashfix
+	if (!GetIWeapon())
+		return;
+	//...
+
+	SvDetachAccessory(inAccessory);
+	AttachAccessory(inAccessory, true, true, true, false);
+	GetGameObject()->InvokeRMI(ClAttachAccessory(), RequestAttachAccessoryParams(inAccessory.c_str()), eRMI_ToAllClients | eRMI_NoLocalCalls);
+
+
+	/*
 	const ItemString& accessory = (inAccessory == g_pItemStrings->SCARSleepAmmo) ? g_pItemStrings->SCARTagAmmo : inAccessory;
 
 	SAccessoryParams* params = GetAccessoryParams(accessory);
@@ -103,7 +138,7 @@ void CItem::SvSwitchAccessory(const ItemString& inAccessory)
 	if (!attached) {
 		AttachAccessory(accessory, true, true, true);
 		CryLogAlways("[nothing else] putting %s ON", accessory.c_str());
-	}
+	}*/
 }
 
 //------------------------------------------------------------------------
@@ -112,7 +147,7 @@ CItem* CItem::AddAccessory(const ItemString& name)
 	SAccessoryParams* pAccessoryParams = GetAccessoryParams(name);
 	if (!pAccessoryParams)
 	{
-		CryLogWarning("Trying to add unknown accessory '%s' to item '%s'!", name.c_str(), GetEntity()->GetName());
+		CryLogAlways("Trying to add unknown accessory '%s' to item '%s'!", name.c_str(), GetEntity()->GetName());
 		return 0;
 	}
 
@@ -130,7 +165,7 @@ CItem* CItem::AddAccessory(const ItemString& name)
 
 	if (!params.pClass)
 	{
-		CryLogWarning("Trying to add unknown accessory '%s' to item '%s'!", name.c_str(), GetEntity()->GetName());
+		CryLogAlways("Trying to add unknown accessory '%s' to item '%s'!", name.c_str(), GetEntity()->GetName());
 		return 0;
 	}
 
@@ -138,9 +173,13 @@ CItem* CItem::AddAccessory(const ItemString& name)
 	if (IEntity* pEntity = m_pEntitySystem->SpawnEntity(params))
 		accId = pEntity->GetId();
 
+	//CryLogAlways("added to map %s!",name.c_str());
 	m_accessories.insert(TAccessoryMap::value_type(name, accId));
 	if (accId)
 		return static_cast<CItem*>(m_pItemSystem->GetItem(accId));
+
+	//CryLogAlways("FAILED to ADD one");
+
 	return 0;
 }
 
@@ -151,6 +190,7 @@ void CItem::RemoveAccessory(const ItemString& name)
 	if (it != m_accessories.end())
 	{
 		m_pEntitySystem->RemoveEntity(it->second);
+		//CryLogAlways("erased from!! map %s!", name.c_str());
 		m_accessories.erase(it);
 	}
 }
@@ -250,7 +290,11 @@ void CItem::AttachAccessory(const ItemString& name, bool attach, bool noanim, bo
 			else
 				action.execute(this);
 
+		} else {
+			CryLogAlways("NOT attaced %s!!",name.c_str());
 		}
+
+
 	}
 	else
 	{
@@ -270,6 +314,9 @@ void CItem::AttachAccessory(const ItemString& name, bool attach, bool noanim, bo
 				SetBusy(true);
 				action.execute(this);
 			}
+		}
+		else {
+			CryLogAlways("NOT detaced %s", name.c_str());
 		}
 	}
 

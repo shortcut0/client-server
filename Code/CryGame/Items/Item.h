@@ -28,6 +28,8 @@
 #include <map>
 #include <list>
 
+// Server
+#include "CryMP/Server/ServerCVars.h"
 
 #include "ItemScheduler.h"
 #include "ItemString.h"
@@ -132,6 +134,11 @@ public:
 	struct AttachAction;
 	struct DetachAction;
 	struct SelectAction;
+
+
+	// -----------------------------------------------------------------------
+	// Server
+	bool m_bRMIDrop = false; // drop request came from a client
 
 	//------------------------------------------------------------------------
 	// Typedefs
@@ -1039,7 +1046,7 @@ public:
 	void NetSetOwnerId(EntityId id);
 
 	//LAW special stuff
-	bool IsAutoDroppable() { return m_params.auto_droppable;}
+	bool IsAutoDroppable() { return m_params.auto_droppable && (g_pServerCVars->server_autodrop_rpg > 0);}
 
 	struct RequestAttachAccessoryParams
 	{

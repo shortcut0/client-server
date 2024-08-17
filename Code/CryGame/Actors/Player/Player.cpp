@@ -6725,9 +6725,11 @@ void CPlayer::RecordExplosivePlaced(EntityId entityId, uint8 typeId)
 	bool debug = (g_pGameCVars->g_debugMines != 0);
 
 	if (typeId == 0)
-		limit = g_pGameCVars->g_claymore_limit;
+		limit = g_pGameCVars->g_claymore_limit; // CLAY
 	else if (typeId == 1)
-		limit = g_pGameCVars->g_avmine_limit;
+		limit = g_pGameCVars->g_avmine_limit; // AV
+	else if (typeId == 2)
+		limit = g_pServerCVars->server_c4_limit; // C4
 
 	std::list<EntityId>& explosives = m_explosiveList[typeId];
 
@@ -6741,6 +6743,12 @@ void CPlayer::RecordExplosivePlaced(EntityId entityId, uint8 typeId)
 		gEnv->pEntitySystem->RemoveEntity(explosiveId);
 	}
 	explosives.push_back(entityId);
+
+	// Server
+	IEntity* pEntity = g_pGame->GetIGameFramework()->GetISystem()->GetIEntitySystem()->GetEntity(entityId);
+	if (pEntity) {
+		gServer->GetEvents()->Call("ServerRPC.Callbacks.OnExplosivePlaced", ScriptHandle(GetEntityId()), ScriptHandle(entityId), (int)typeId, (int)explosives.size(), limit);
+	} //...
 
 	if (debug)
 		CryLog("%s: Explosive(%d) placed: %d, now %d", GetEntity()->GetName(), typeId, entityId, explosives.size());
@@ -6764,6 +6772,12 @@ void CPlayer::RecordExplosiveDestroyed(EntityId entityId, uint8 typeId)
 		if (debug)
 			CryLog("%s: Explosive(%d) destroyed but not in list: %d", GetEntity()->GetName(), typeId, entityId);
 	}
+
+	// Server
+	IEntity* pEntity = g_pGame->GetIGameFramework()->GetISystem()->GetIEntitySystem()->GetEntity(entityId);
+	if (pEntity) {
+		gServer->GetEvents()->Call("ServerRPC.Callbacks.OnExplosiveRemoved", ScriptHandle(GetEntityId()), ScriptHandle(entityId), (int)typeId, (int)explosives.size());
+	} //...
 }
 
 //------------------------------------------------------------------------

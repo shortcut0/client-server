@@ -969,9 +969,13 @@ void CGameRules::RevivePlayer(CActor* pActor, const Vec3& pos, const Ang3& angle
 	if (IsFrozen(pActor->GetEntityId()))
 		FreezeEntity(pActor->GetEntityId(), false, false);
 
+	// Server
 	int health = 100;
-	if (!gEnv->bMultiplayer && pActor->IsClient())
-		health = g_pGameCVars->g_playerHealthValue;
+	//if (!gEnv->bMultiplayer && pActor->IsClient())
+	//	health = g_pGameCVars->g_playerHealthValue;
+	health = g_pGameCVars->g_playerHealthValue;
+	//...
+
 	pActor->SetMaxHealth(health);
 
 	if (!m_pGameFramework->IsChannelOnHold(pActor->GetChannelId()))
@@ -1180,6 +1184,10 @@ void CGameRules::MovePlayer(CActor* pActor, const Vec3& pos, const Ang3& angles)
 	CActor::MoveParams params(pos, Quat(angles));
 	pActor->GetGameObject()->InvokeRMI(CActor::ClMoveTo(), params, eRMI_ToClientChannel | eRMI_NoLocalCalls, pActor->GetChannelId());
 	pActor->GetEntity()->SetWorldTM(Matrix34::Create(Vec3(1, 1, 1), params.rot, params.pos));
+
+	// Server (AC)
+	if (IScriptTable* pActorScript = pActor->GetEntity()->GetScriptTable())
+		pActorScript->SetValue("LastTeleport", gEnv->pTimer->GetAsyncTime().GetSeconds());
 }
 
 //------------------------------------------------------------------------
