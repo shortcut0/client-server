@@ -79,6 +79,14 @@ CProjectile::~CProjectile()
 }
 
 //------------------------------------------------------------------------
+// Server
+
+void CProjectile::SetOwnerId(EntityId newOwnerId)
+{
+	m_ownerId = newOwnerId;
+}
+
+//------------------------------------------------------------------------
 bool CProjectile::SetAspectProfile(EEntityAspects aspect, uint8 profile)
 {
 	//if (m_pAmmoParams->physicalizationType == ePT_None)
@@ -539,6 +547,8 @@ void CProjectile::SetVelocity(const Vec3& pos, const Vec3& dir, const Vec3& velo
 	}
 
 	Vec3 totalVelocity = (dir * m_pAmmoParams->speed * speedScale) + velocity;
+	if (CWeapon *pWpn = GetWeapon())
+		totalVelocity *= pWpn->m_projectileVelocityScale;
 
 	if (m_pPhysicalEntity->GetType() == PE_PARTICLE)
 	{
@@ -788,13 +798,14 @@ void CProjectile::Explode(bool destroy, bool impact, const Vec3& pos, const Vec3
 		IScriptTable* pWeaponLua = NULL;
 
 
-		if (pWeapon || (strcmp(pClass, "scargrenade") || strcmp(pClass, "explosivegrenade") == 0)) {
+		if (pWeapon || (strcmp(pClass, "scargrenade") == 0 || strcmp(pClass, "explosivegrenade") == 0)) {
 
 			if (pWeapon)
 				pWeaponLua = pWeapon->GetScriptTable();
 
 			//CryLogAlways("Checking MODS..");
-			if (gServer->GetEvents()->Get("ServerRPC.Callbacks.OnProjectileExplosion", mods, pWeaponLua, pWeapon ? pWeapon->GetClass()->GetName() : "", ScriptHandle(GetEntityId()), effectName, epos, dir, normal) && mods.GetPtr()) {
+			const char* sClassName = pClass;
+			if (gServer->GetEvents()->Get("ServerRPC.Callbacks.OnProjectileExplosion", mods, pWeaponLua ? pWeaponLua : 0, pWeapon ? pWeapon->GetClass()->GetName() : "", pClass, ScriptHandle(GetEntityId()), effectName, epos, dir, normal) && mods.GetPtr()) {
 
 				remove_projectile = (mods->GetValue("RemoveProjectile", remove_projectile) && remove_projectile);
 				skip_explosion = (mods->GetValue("SkipExplosion", skip_explosion) && skip_explosion);
@@ -803,6 +814,9 @@ void CProjectile::Explode(bool destroy, bool impact, const Vec3& pos, const Vec3
 
 				//CryLogAlways("Mods received..");
 			}
+		}
+		else {
+			CryLogAlways("unhandled %s", pClass);
 		}
 
 		// --------------------------------------------------------
@@ -1345,16 +1359,32 @@ void CProjectile::OnHit(const HitInfo& hit) //server only
 			return;
 	}
 
-	// Events..
-	if (hit.shooterId && (pClayClass == pThisClass || pClayClass == pC4Class || pClayClass == pAVClass))
-		gServer->GetEvents()->Call("ServerRPC.Callbacks.OnProjectileHit", ScriptHandle(hit.shooterId), ScriptHandle(GetEntityId()), hit.damage, ScriptHandle(hit.weaponId), hit.pos, hit.normal);
-
 	//Reduce hit points if hit, and explode (only for C4, AVMine and ClayMore)
+	bool destroyed = false;
 	if (hit.targetId == GetEntityId() && m_hitPoints > 0 && !m_destroying)
 	{
 		m_hitPoints -= (int)hit.damage;
-		if (m_hitPoints <= 0)
+		destroyed = m_hitPoints <= 0;
+		if (destroyed)
 			Explode(true);
+	}
+	/*
+	CryLogAlways("projectile %s hit..", pThisClass->GetName());
+	CryLogAlways("hit.type			= %d", hit.type);
+	CryLogAlways("hit.angle			= %f", hit.angle);
+	CryLogAlways("hit.bulletType	= %d", hit.bulletType);
+	CryLogAlways("hit.fmId			= %d", hit.fmId);
+	CryLogAlways("hit.projectileId	= %x", hit.projectileId);
+	CryLogAlways("hit.material		= %d", hit.material);
+	CryLogAlways("hit.partId		= %d", hit.partId);
+	CryLogAlways("hit.shooterId		= %d", hit.shooterId);
+	CryLogAlways("hit.targetId		= %d", hit.targetId);
+	CryLogAlways("hit.weaponId		= %d", hit.weaponId);
+	*/
+	// Events..
+	if (hit.targetId == GetEntityId() && hit.shooterId && (pThisClass == pClayClass || pThisClass == pC4Class || pThisClass == pAVClass)) {
+		gServer->GetEvents()->Call("ServerRPC.Callbacks.OnProjectileHit", ScriptHandle(hit.shooterId), ScriptHandle(GetEntityId()), destroyed, hit.damage, ScriptHandle(hit.weaponId), hit.pos, hit.normal);
+		//CryLogAlways("calling ! ! ! %s==%s||%s==%s||%s==%s", pThisClass->GetName(),pClayClass->GetName(), pThisClass->GetName(), pC4Class->GetName(), pThisClass->GetName(), pAVClass->GetName());
 	}
 }
 //==================================================================

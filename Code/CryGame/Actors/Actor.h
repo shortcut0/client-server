@@ -791,6 +791,18 @@ public:
 	CActor();
 	virtual ~CActor();
 
+	// -----------------------------------------------------------------
+	// Server
+	virtual bool SetAspectProfile_ORIGINAL(EEntityAspects aspect, uint8 profile); // Original Code
+	virtual bool SetAspectProfile_CryMP(EEntityAspects aspect, uint8 profile); // CryMP Code
+	// -----------------------------------------------------------------
+
+	// IGameObjectProfileManager
+
+	virtual bool SetAspectProfile(EEntityAspects aspect, uint8 profile);
+	virtual uint8 GetDefaultProfile(EEntityAspects aspect) { return aspect == eEA_Physics ? eAP_NotPhysicalized : 0; }
+	// ~IGameObjectProfileManager
+
 	// IActor
 	virtual void ProcessEvent(SEntityEvent& event);
 	virtual void Release() { delete this; };
@@ -839,11 +851,6 @@ public:
 	virtual void HideAllAttachments(bool isHiding);
 
 	// ~IActor
-
-	// IGameObjectProfileManager
-	virtual bool SetAspectProfile(EEntityAspects aspect, uint8 profile);
-	virtual uint8 GetDefaultProfile(EEntityAspects aspect) { return aspect == eEA_Physics ? eAP_NotPhysicalized : 0; }
-	// ~IGameObjectProfileManager
 
 	// IActionListener
 	virtual void OnAction(const ActionId& actionId, int activationMode, float value);

@@ -84,6 +84,16 @@ public:
 	CWeapon();
 	virtual ~CWeapon();
 
+	// --------------------------------------------------------
+	// Server
+	
+	float m_nextCheck = 0.f;
+	float m_projectileVelocityScale = 1.0f; // scales speed of all projectiles!
+	const char* m_lastFiredAmmoClass = "";
+	EntityId m_lastFiredAmmoId = NULL;
+
+	// --------------------------------------------------------
+
 	// IItem, IGameObjectExtension
 	virtual bool Init(IGameObject* pGameObject);
 	virtual void InitClient(int channelId) { CItem::InitClient(channelId); };

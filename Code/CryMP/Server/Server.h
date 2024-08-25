@@ -98,6 +98,10 @@ class Server : public IGameFrameworkListener, public ILevelSystemListener, publi
 	SmartScriptTable m_ServerRPCLua;
 	SmartScriptTable m_ServerRPCCallbackLua;
 	bool m_ATOMLuaInitialized = false;
+	bool m_bLevelLoaded = false;
+	bool m_bLuaLoaded = false;
+
+	void InitServerLua();
 
 public:
 
@@ -209,14 +213,17 @@ public:
 		if (m_pSS)
 			m_pSS->GetGlobalValue("SCRIPT_ERROR", error);
 
+		if (!m_bLuaLoaded)
+			return false;
+
 		if (!m_ServerRPCCallbackLua)
 			return false;
 
 		if (!m_ServerRPCLua)
 			return false;
 
-			if (!m_ATOMLua)
-				return false;
+		if (!m_ATOMLua)
+			return false;
 
 		return !error && m_ATOMLuaInitialized;
 	}

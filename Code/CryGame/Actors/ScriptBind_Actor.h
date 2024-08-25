@@ -42,6 +42,9 @@ public:
 	virtual int SetGodMode(IFunctionHandler* pH, int mode);
 	virtual int GetRotation(IFunctionHandler* pH);
 	virtual int GetVehicleViewDir(IFunctionHandler* pH);
+	virtual int GetLookDirection(IFunctionHandler* pH);
+	virtual int GetNetAimDir(IFunctionHandler* pH);
+	virtual int GetLean(IFunctionHandler* pH);
 
 	//------------------------------------------------------------------------
 	virtual int DumpActorInfo(IFunctionHandler* pH);

@@ -617,6 +617,50 @@ void CScriptBind_Weapon::RegisterMethods()
 	SCRIPT_REG_TEMPLFUNC(SvRemoveAccessory, "name");
 	SCRIPT_REG_TEMPLFUNC(SvChangeAccessory, "name");
 	SCRIPT_REG_FUNC(GetAttachedAccessories);
+	SCRIPT_REG_TEMPLFUNC(SetProjectileVelocitySpeedScale, "scale"); // such long name..
+
+	SCRIPT_REG_FUNC(Sv_Melee);
+}
+
+//------------------------------------------------------------------------
+// Server
+int CScriptBind_Weapon::Sv_Melee(IFunctionHandler* pH) 
+{
+	CWeapon* pWeapon = GetWeapon(pH);
+	if (!pWeapon)
+		return pH->EndFunction();
+
+	CActor* pActor = pWeapon->GetOwnerActor();
+	if (!pActor)
+		return pH->EndFunction();
+
+	Vec3 pos(ZERO);
+	Vec3 dir(ZERO);
+	IMovementController* pMC = pActor->GetMovementController();
+	if (!pMC)
+		return pH->EndFunction();
+
+	SMovementState info;
+	pMC->GetMovementState(info);
+	pos = info.eyePosition;
+	dir = info.eyeDirection;
+
+	//m_pWeapon->RequestMeleeAttack(m_pWeapon->GetMeleeFireMode() == this, pos, dir, m_pWeapon->GetShootSeqN());
+	pWeapon->RequestMeleeAttack(true, pos, dir, pWeapon->GetShootSeqN());
+	return pH->EndFunction();
+}
+
+//------------------------------------------------------------------------
+// Server
+int CScriptBind_Weapon::SetProjectileVelocitySpeedScale(IFunctionHandler* pH, float scale) // such long name..
+{
+	CWeapon* pWeapon = GetWeapon(pH);
+	if (!pWeapon)
+		return pH->EndFunction();
+
+	pWeapon->m_projectileVelocityScale = scale;
+
+	return pH->EndFunction();
 }
 
 //------------------------------------------------------------------------

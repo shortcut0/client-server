@@ -455,7 +455,7 @@ bool ScriptSystem::ExecuteFile(const char *fileName, bool raiseError, bool force
 	if (gServer->OverwriteScriptPath(overwrite, fileName) && !overwrite.empty()) {
 
 		fileName = overwrite.c_str();
-		CryLogAlways("[overwrite] > ExecuteFile: %s", fileName);
+	//	CryLogAlways("[overwrite] > ExecuteFile: %s", fileName);
 	}
 
 	const bool isNew = this->AddToScripts(fileName);

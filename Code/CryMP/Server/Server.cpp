@@ -108,27 +108,37 @@ void Server::Init(IGameFramework* pGameFramework)
 	this->m_pServerUtils		= std::make_unique<ServerUtils>();
 	this->m_pCVars				= std::make_unique<ServerCVars>();
 	this->m_pServerStats		= std::make_unique<ServerStats>();
+	this->m_pAC					= std::make_unique<ServerAnticheat>();
 
 	// -----------
 	pGameFramework->RegisterListener(this, "crymp-server", FRAMEWORKLISTENERPRIORITY_DEFAULT);
 	pGameFramework->GetILevelSystem()->AddListener(this);
 	pEntitySystem->AddSink(this);
 
-	// -----------
+	// --------------
+	// Init AntiCheat
+	m_pAC->Init(pGameFramework, GetEvents());
+
+	// --------------
+	// Load Early init
 	if (!m_pSS->ExecuteFile(std::string(m_rootDir.string() + "\\Scripts\\EarlyInit.lua").c_str()))
 		Log("Failed to load EarlyInit.lua");
 	else
 		Log("EarlyInit.lua loaded..");
 
 	// -----------
+	// Init Game
 	g_pGame = new CGame();
 	g_pGame->Init(pGameFramework);
 
 	// -----------
+	// Init utils and cvars
 	m_pServerUtils->Init();
 	InitCommands(pConsole);
 	InitCVars(pConsole);
-	InitMasters(); // Must be done before network stuff
+	InitMasters(); 
+	
+	// Must be done before network stuff
 	//m_pServerPublisher->Init(gEnv->pSystem);
 
 	// -----------
@@ -147,6 +157,10 @@ void Server::Init(IGameFramework* pGameFramework)
 
 	std::string overwriteFile = m_rootDir.string() + "/Scripts/GameOverwrites.txt";
 	InitGameOverwrites(overwriteFile);
+
+	// -----------
+	//LOAD lua, NOT INIT
+	InitLua();
 
 	// test!!
 	//m_pOverwriteSF.push_back(std::make_pair("scripts/gamerules/powerstruggle.lua", std::string("../" + m_rootDir.filename().string() + "/Scripts/Game/GameRules/powerstruggle.lua")));
@@ -186,7 +200,7 @@ void Server::UpdateLoop()
 				//if (GetStats()->Update(m_tickCounter))
 				//	CryLogAlways("%02.2f - %f, %f - %s", GetStats()->GetCPUUsage(), GetStats()->GetMemUsage(), GetStats()->GetMemPeak(), GetStats()->GetCPUName().c_str());
 
-				if (m_ServerRPCCallbackLua) {
+				if (m_ServerRPCCallbackLua && m_ServerRPCCallbackLua.GetPtr()) {
 
 					Script::CallMethod(m_ServerRPCCallbackLua, "OnUpdate");
 
@@ -382,6 +396,8 @@ void Server::OnInitLuaCmd(IConsoleCmdArgs* pArgs) {
 // -------------------------------------
 void Server::InitLua() {
 
+	m_bLuaLoaded = false;
+
 	// -----
 	m_pSS->SetGlobalValue("CRYMP_SERVER_EXE", CRYMP_SERVER_EXE_NAME);
 	m_pSS->SetGlobalValue("CRYMP_SERVER_BITS", CRYMP_SERVER_BITS);
@@ -397,15 +413,40 @@ void Server::InitLua() {
 	}
 
 	// -----
-	Log("Loading Server Script %s...", m_serverScriptPath.c_str());
 
 	// -----
+	// horrble..horrable..horrable..horrable IF X FIX IF X IFI FIIIFIXIFIX OmggggAHo
+	if (!m_bLevelLoaded) {
+		Log("Loading Server Script %s...", m_serverScriptPath.c_str());
+		if (!m_pSS->ExecuteFile(m_serverScriptPath.c_str(), true, true)) {
+			LogError("Failed to load the Server Script %s", m_serverScriptPath.c_str());
+			return;
+		}
+	}
+
+	if (m_bLevelLoaded)
+		InitServerLua();
+
+	Log("Server Main Script Loaded");
+	m_bLuaLoaded = true;
+	return;
+}
+
+// -------------------------------------
+void Server::InitServerLua()
+{
+
+	// Reset this flag every time! in case the user breaks our scripts to avoid a fatal crash!
+	m_ATOMLuaInitialized = false;
+
+	// -----
+	// fix this.. its load it AGAIN..
+	Log("Loading Server Script %s...", m_serverScriptPath.c_str());
 	if (!m_pSS->ExecuteFile(m_serverScriptPath.c_str(), true, true)) {
 		LogError("Failed to load the Server Script %s", m_serverScriptPath.c_str());
 		return;
 	}
 
-	// -----
 	if (!m_pSS->GetGlobalValue("Server", m_ATOMLua)) {
 		LogError("Server Global not found (Server Script: %s)", m_serverScriptPath.c_str());
 		return;
@@ -423,9 +464,9 @@ void Server::InitLua() {
 		return;
 	}
 
-	Log("Server Script Loaded");
 	m_ATOMLuaInitialized = true;
-	return;
+	Log("Server Initialized!");
+
 }
 
 // -------------------------------------
@@ -498,6 +539,14 @@ void Server::OnLoadingStart(ILevelInfo* pLevel)
 // -------------------------------------
 void Server::OnLoadingComplete(ILevel* pLevel)
 {
+
+	m_bLevelLoaded = true;
+	//InitLua();
+	if (!m_bLuaLoaded)
+		InitLua(); // reload all
+	else
+		InitServerLua(); // init server
+
 	if (m_pSS) {
 		m_pSS->SetGlobalValue("MAP_START_TIME", gEnv->pTimer->GetCurrTime());
 		if (IsLuaReady()) {
@@ -505,7 +554,6 @@ void Server::OnLoadingComplete(ILevel* pLevel)
 		}
 	}
 
-	InitLua();
 }
 
 // -------------------------------------
@@ -656,6 +704,10 @@ bool Server::OnBeforeSpawn(SEntitySpawnParams& params)
 		}*/
 	}
 
+	if (gEnv->pEntitySystem->FindEntityByName(params.sName)) {
+		LogWarning("Spawning entity without unique name! It's %s", params.sName);
+	}
+
 	return true;
 }
 
@@ -751,7 +803,7 @@ void Server::InitGameOverwrites(const std::string& filename) {
 			game_replace.erase(game_replace.find_last_not_of(" \t") + 1);
 
 			// Add to the vector
-			Log("Added overwrite: %s = %s", game_original.c_str(), game_replace.c_str());
+			//Log("Added overwrite: %s = %s", game_original.c_str(), game_replace.c_str());
 			//m_pOverwriteSF.push_back(std::make_pair(game_original, std::string(/*"../" +*/ root + "/" + game_replace)));
 			m_pOverwriteSF.push_back(std::make_pair(game_original, std::string(m_rootDir.string() + "/" + game_replace))); // ned to make it a full path!
 		}
@@ -771,7 +823,7 @@ bool Server::OverwriteScriptPath( std::string &output, const std::string& input)
 	// Find the element with the matching key in the vector
 	auto it = std::find_if(m_pOverwriteSF.begin(), m_pOverwriteSF.end(),
 		[&lowerInput](const std::pair<std::string, std::string>& pair) {
-			CryLogAlways("compare %-30s->%s", pair.first.c_str(), lowerInput.c_str());
+			//CryLogAlways("compare %-30s->%s", pair.first.c_str(), lowerInput.c_str());
 
 			std::string lowerFirst = pair.first;
 			std::transform(lowerFirst.begin(), lowerFirst.end(), lowerFirst.begin(), ::tolower);

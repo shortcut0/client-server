@@ -75,6 +75,18 @@ History:
 // Server
 #include "CryMP/Server/Server.h"
 
+
+// ----------------------------------------------------------------------------
+// Server
+
+#define CRYMP_PLAYER_REQUEST() \
+	{ \
+		if (pNetChannel && m_pGameFramework->GetGameChannelId(pNetChannel) != GetChannelId()) \
+			return false; \
+	}
+// ----------------------------------------------------------------------------
+// 
+// 
 // enable this to check nan's on position updates... useful for debugging some weird crashes
 #define ENABLE_NAN_CHECK
 
@@ -725,6 +737,15 @@ void CPlayer::UpdateFirstPersonEffects(float frameTime)
 
 void CPlayer::Update(SEntityUpdateContext& ctx, int updateSlot)
 {
+
+	Vec3 cp = GetEntity()->GetWorldPos();
+	//CryLogAlways("CPlayer::%s::Update(current: %.2f,%.2f,%.2f)", GetEntity()->GetName(), cp.x, cp.y, cp.z);
+
+
+
+	//if (true)
+	//	return;
+
 	FUNCTION_PROFILER(GetISystem(), PROFILE_GAME);
 
 	IEntityRenderProxy* pRenderProxy = (IEntityRenderProxy*)(GetEntity()->GetProxy(ENTITY_PROXY_RENDER));
@@ -6445,6 +6466,11 @@ void CPlayer::LeaveLadder(ELadderActionType reason)
 //------------------------------------------------------------------------
 IMPLEMENT_RMI(CPlayer, SvRequestGrabOnLadder)
 {
+	// --------------------------------------------
+	// Server
+	CRYMP_PLAYER_REQUEST();
+	// ...
+
 	if (IsLadderUsable() && m_stats.ladderTop.IsEquivalent(params.topPos) && m_stats.ladderBottom.IsEquivalent(params.bottomPos))
 	{
 		GrabOnLadder(static_cast<ELadderActionType>(params.reason));
@@ -6455,6 +6481,12 @@ IMPLEMENT_RMI(CPlayer, SvRequestGrabOnLadder)
 //------------------------------------------------------------------------
 IMPLEMENT_RMI(CPlayer, SvRequestLeaveLadder)
 {
+	// --------------------------------------------
+	// Server
+	CRYMP_PLAYER_REQUEST();
+	// ...
+
+
 	if (m_stats.isOnLadder)
 	{
 		if (m_stats.ladderTop.IsEquivalent(params.topPos) && m_stats.ladderBottom.IsEquivalent(params.bottomPos))
@@ -7121,6 +7153,12 @@ bool CPlayer::IsSprinting()
 //------------------------------------------------------------------------
 IMPLEMENT_RMI(CPlayer, SvRequestUnfreeze)
 {
+	// --------------------------------------------
+	// Server
+	CRYMP_PLAYER_REQUEST();
+	// ...
+
+
 	if (params.delta > 0.0f && params.delta <= 1.0f && GetHealth() > 0)
 	{
 		SetFrozenAmount(m_frozenAmount - params.delta);
@@ -7137,6 +7175,13 @@ IMPLEMENT_RMI(CPlayer, SvRequestUnfreeze)
 //------------------------------------------------------------------------
 IMPLEMENT_RMI(CPlayer, SvRequestHitAssistance)
 {
+	// --------------------------------------------
+	// Server
+	CRYMP_PLAYER_REQUEST();
+	// ...
+
+
+	gServer->GetEvents()->Call("ServerRPC.Callbacks.OnHitAssistance", ScriptHandle(GetEntityId()));
 	m_bHasAssistance = params.assistance;
 	return true;
 }
@@ -7178,6 +7223,12 @@ IMPLEMENT_RMI(CPlayer, ClJump)
 //------------------------------------------------------------------------
 IMPLEMENT_RMI(CPlayer, SvRequestJump)
 {
+	// --------------------------------------------
+	// Server
+	CRYMP_PLAYER_REQUEST();
+	// ...
+
+
 	GetGameObject()->InvokeRMI(ClJump(), params, eRMI_ToOtherClients | eRMI_NoLocalCalls, m_pGameFramework->GetGameChannelId(pNetChannel));
 	GetGameObject()->Pulse('bang');
 
@@ -7200,6 +7251,12 @@ IMPLEMENT_RMI(CPlayer, SvRequestJump)
 //------------------------------------------------------------------------
 IMPLEMENT_RMI(CPlayer, SvRequestParachute)
 {
+	// --------------------------------------------
+	// Server
+	CRYMP_PLAYER_REQUEST();
+	// ...
+
+
 	if (!IsClient() && m_parachuteEnabled && (m_stats.inFreefall.Value() == 1))
 	{
 		ChangeParachuteState(3);

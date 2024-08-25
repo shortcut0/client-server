@@ -41,6 +41,9 @@ public:
 	int SvRemoveAccessory(IFunctionHandler* pH, const char* name);
 	int SvChangeAccessory(IFunctionHandler* pH, const char* name);
 	int GetAttachedAccessories(IFunctionHandler* pH);
+	int SetProjectileVelocitySpeedScale(IFunctionHandler* pH, float scale); // such long name..
+
+	int Sv_Melee(IFunctionHandler* pH);
 
 	// ...
 

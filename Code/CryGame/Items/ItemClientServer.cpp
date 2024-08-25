@@ -19,6 +19,16 @@ History:
 #include "CryMP/Server/Server.h"
 
 
+// ----------------------------------------------------------------------------
+// Server
+
+#define CRYMP_ITEM_REQUEST() \
+	{ \
+		if (pNetChannel && m_pGameFramework->GetGameChannelId(pNetChannel) != GetChannelId()) \
+			return; \
+	}
+// ----------------------------------------------------------------------------
+
 //------------------------------------------------------------------------
 EntityId CItem::NetGetOwnerId() const
 {
@@ -85,6 +95,10 @@ void CItem::PostInitClient(int channelId)
 //------------------------------------------------------------------------
 IMPLEMENT_RMI(CItem, SvRequestAttachAccessory)
 {
+
+	// Server
+	// TODO: some small owner check?
+
 	if (IInventory* pInventory = GetActorInventory(GetOwnerActor()))
 	{
 		if (pInventory->GetCountOfClass(params.accessory.c_str()) > 0)
@@ -123,6 +137,10 @@ IMPLEMENT_RMI(CItem, ClAttachAccessory)
 //------------------------------------------------------------------------
 IMPLEMENT_RMI(CItem, SvRequestEnterModify)
 {
+
+	// Server
+	// TODO: some small owner check?
+
 	GetGameObject()->InvokeRMI(ClEnterModify(), params, eRMI_ToOtherClients, m_pGameFramework->GetGameChannelId(pNetChannel));
 
 	return true;
@@ -131,6 +149,10 @@ IMPLEMENT_RMI(CItem, SvRequestEnterModify)
 //------------------------------------------------------------------------
 IMPLEMENT_RMI(CItem, SvRequestLeaveModify)
 {
+
+	// Server
+	// TODO: some small owner check?
+
 
 	// Server
 	bool bOk = true;

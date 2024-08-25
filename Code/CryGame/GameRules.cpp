@@ -890,7 +890,11 @@ void CGameRules::AddTaggedEntity(EntityId shooter, EntityId targetId, bool tempo
 	// add PP and CP for tagging this entity
 	ScriptHandle shooterHandle(shooter);
 	ScriptHandle targetHandle(targetId);
-	CallScript(m_serverScript, "OnAddTaggedEntity", shooterHandle, targetHandle);
+	const char* tClass = "";
+	if (IEntity* ptarget = gEnv->pEntitySystem->GetEntity(targetId))
+		tClass = ptarget->GetClass()->GetName();
+
+	CallScript(m_serverScript, "OnAddTaggedEntity", shooterHandle, targetHandle, tClass);
 }
 
 //------------------------------------------------------------------------
@@ -1138,7 +1142,10 @@ bool CGameRules::IsNameTaken(const char* name, IEntity* pEntity)
 //------------------------------------------------------------------------
 void CGameRules::KillPlayer(CActor* pActor, bool dropItem, bool ragdoll, EntityId shooterId, EntityId weaponId, float damage, int material, int hit_type, const Vec3& impulse)
 {
-	if (!gEnv->bServer)
+	if (!gEnv->bServer || !pActor)
+		return;
+
+	if (pActor->m_godMode > 0)
 		return;
 
 	IInventory* pInventory = pActor->GetInventory();
@@ -2928,8 +2935,22 @@ void CGameRules::SendChatMessage(EChatMessageType type, EntityId sourceId, Entit
 	if (gEnv->bServer)
 	{
 		bool show = true;
-		gServer->GetEvents()->Get("ServerRPC.Callbacks.OnChatMessage", show, int(type), ScriptHandle(sourceId), ScriptHandle(targetId), msg, m_chatScriptBind_forcedTeam, m_chatScriptBind_svChat);
-		
+		const char* newMsg = "";
+
+		SmartScriptTable mods;
+		if (gServer->GetEvents()->Get("ServerRPC.Callbacks.OnChatMessage", mods, int(type), ScriptHandle(sourceId), ScriptHandle(targetId), msg, m_chatScriptBind_forcedTeam, m_chatScriptBind_svChat))
+		{
+
+			if (mods.GetPtr()) {
+				mods->GetValue("ShowMessage", show);
+				if (mods->GetValue("NewMessage", newMsg))
+					params.msg = newMsg;
+
+				CryLogAlways("pointer mods received");
+			}
+			CryLogAlways("mods received");
+		}
+
 		//CryLogAlways("Show = %s", show ? "yes" : "no");
 		if (show) {
 			switch (type)

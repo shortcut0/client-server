@@ -164,7 +164,10 @@ void ServerEvents::OnStopFire(IWeapon* pWeapon, EntityId shooterId) {
 
 
 void ServerEvents::OnStartReload(IWeapon* pWeapon, EntityId shooterId, IEntityClass* pAmmoType) {
-
+	if (CWeapon* pWpn = static_cast<CWeapon*>(pWeapon)) {
+		EntityId weaponId = pWpn->GetEntityId();
+		Call("ServerRPC.Callbacks.OnStartReload", ScriptHandle(shooterId), ScriptHandle(weaponId));
+	}
 }
 
 
@@ -209,6 +212,10 @@ void ServerEvents::OnDropped(IWeapon* pWeapon, EntityId actorId) {
 
 void ServerEvents::OnMelee(IWeapon* pWeapon, EntityId shooterId) {
 
+	if (CWeapon* pWpn = static_cast<CWeapon*>(pWeapon)) {
+		EntityId weaponId = pWpn->GetEntityId();
+		Call("ServerRPC.Callbacks.OnMelee", ScriptHandle(shooterId), ScriptHandle(weaponId));
+	}
 }
 
 

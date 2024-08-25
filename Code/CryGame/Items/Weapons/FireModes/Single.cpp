@@ -2895,10 +2895,14 @@ void CSingle::NetShoot(const Vec3& hit, int predictionHandle) //called from serv
 void CSingle::NetShootEx(const Vec3& pos, const Vec3& dir, const Vec3& vel, const Vec3& hit, float extra, int predictionHandle)
 {
 	IEntityClass* ammo = m_fireparams.ammo_type_class;
+	// Server
+	if (m_pWeapon)
+		m_pWeapon->m_lastFiredAmmoClass = ammo ? ammo->GetName() : "";
 
 	//assert(ammo && "NetShootEx: There's no ammo class type");
 	if (!ammo)
 		return;
+
 
 	int ammoCount = m_pWeapon->GetAmmoCount(ammo);
 
@@ -2951,6 +2955,11 @@ void CSingle::NetShootEx(const Vec3& pos, const Vec3& dir, const Vec3& vel, cons
 	CProjectile* pAmmo = m_pWeapon->SpawnAmmo(ammo, true);
 	if (pAmmo)
 	{
+
+		// server
+		if (m_pWeapon) m_pWeapon->m_lastFiredAmmoId = pAmmo->GetEntityId();
+		//...
+
 		if (m_fireparams.track_projectiles && gEnv->bServer)
 			pAmmo->SetTracked(true);
 
@@ -2975,6 +2984,10 @@ void CSingle::NetShootEx(const Vec3& pos, const Vec3& dir, const Vec3& vel, cons
 			EmitTracer(pos, hit, ooa);
 
 		m_projectileId = pAmmo->GetEntity()->GetId();
+	}
+	else {
+		// server
+		if (m_pWeapon) m_pWeapon->m_lastFiredAmmoId = NULL;
 	}
 
 	if (m_pWeapon->IsServer())

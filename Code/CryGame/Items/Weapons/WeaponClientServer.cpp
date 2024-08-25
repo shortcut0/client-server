@@ -19,6 +19,7 @@
 
 // Server
 #include "CryMP/Server/Server.h"
+//#include "CryMP/Server/Anticheat.h"
 
 /*
 #define CHECK_OWNER_REQUEST()	\
@@ -37,6 +38,36 @@
 		} \
 	} \
 */
+
+// ----------------------------------------------------------------------------
+// Server
+
+#define CRYMP_OWNER_REQUEST() \
+	{ \
+		if (gEnv->pTimer->GetCurrTime() >= m_nextCheck) { \
+			m_nextCheck += g_pServerCVars->server_anticheat_weaponCheckInterval; \
+			IActor *pOwnerActor = GetOwnerActor(); \
+			if (!gServer->GetAC()->CheckOwnerRequest(pNetChannel, pOwnerActor?pOwnerActor->GetEntityId():0, "RMI Spoof", __FUNCTION__, ScriptHandle(GetEntityId()))) \
+				return false; \
+		} \
+	}
+
+#define CRYMP_CHECK_DISTANCE(name) \
+    { \
+        IActor *pOwnerActor = GetOwnerActor(); \
+        if (pOwnerActor && \
+            !gServer->GetAC()->CheckDistance(pNetChannel, GetEntity()->GetPos(), params.pos, 120.f, name, __FUNCTION__, ScriptHandle(GetEntityId()))) \
+        { \
+            return false; \
+        } \
+    }
+
+
+
+// ----------------------------------------------------------------------------
+
+
+
 
 #define CHECK_OWNER_REQUEST()	\
 	{ \
@@ -104,14 +135,19 @@ void CWeapon::NetStartMeleeAttack(bool weaponMelee)
 //------------------------------------------------------------------------
 void CWeapon::NetMeleeAttack(bool weaponMelee, const Vec3 &pos, const Vec3 &dir)
 {
+
+	CryLogAlways("melee x=%f,y=%f,z=%f,   x=%f,y=%f,z=%f,",
+		pos.x,pos.y,pos.z,dir.x,dir.y,dir.z);
 	if (weaponMelee && m_melee)
 	{
+		CryLogAlways("m_melee");
 		m_melee->NetShootEx(pos, dir, ZERO, ZERO, 1.0f, 0);
 		if (IsServer())
 			m_pGameplayRecorder->Event(GetOwner(), GameplayEvent(eGE_WeaponMelee, 0, 0, (void *)GetEntityId()));
 	}
 	else if (m_fm)
 	{
+		CryLogAlways("m_fm");
 		m_fm->NetShootEx(pos, dir, ZERO, ZERO, 1.0f, 0);
 		if (IsServer())
 			m_pGameplayRecorder->Event(GetOwner(), GameplayEvent(eGE_WeaponMelee, 0, 0, (void *)GetEntityId()));
@@ -376,7 +412,9 @@ void CWeapon::SendEndReload()
 //------------------------------------------------------------------------
 IMPLEMENT_RMI(CWeapon, SvRequestStartFire)
 {
-	CHECK_OWNER_REQUEST();
+
+	//CHECK_OWNER_REQUEST();
+	CRYMP_OWNER_REQUEST();
 
 	GetGameObject()->InvokeRMI(CWeapon::ClStartFire(), params, eRMI_ToOtherClients|eRMI_NoLocalCalls, 
 		m_pGameFramework->GetGameChannelId(pNetChannel));
@@ -394,7 +432,8 @@ IMPLEMENT_RMI(CWeapon, SvRequestStartFire)
 //------------------------------------------------------------------------
 IMPLEMENT_RMI(CWeapon, SvRequestStopFire)
 {
-	CHECK_OWNER_REQUEST();
+	//CHECK_OWNER_REQUEST();
+	CRYMP_OWNER_REQUEST();
 
 	GetGameObject()->InvokeRMI(CWeapon::ClStopFire(), params, eRMI_ToOtherClients|eRMI_NoLocalCalls, 
 		m_pGameFramework->GetGameChannelId(pNetChannel));
@@ -428,7 +467,9 @@ IMPLEMENT_RMI(CWeapon, ClStopFire)
 //------------------------------------------------------------------------
 IMPLEMENT_RMI(CWeapon, SvRequestShoot)
 {
-	CHECK_OWNER_REQUEST();
+	//CHECK_OWNER_REQUEST();
+	CRYMP_OWNER_REQUEST();
+	//CRYMP_CHECK_DISTANCE("Shoot Pos");
 
 	bool ok=true;
 	CActor *pActor=GetActorByNetChannel(pNetChannel);
@@ -462,7 +503,16 @@ IMPLEMENT_RMI(CWeapon, SvRequestShoot)
 			//	pGameRules->ValidateShot(pActor->GetEntityId(), GetEntityId(), params.seq, params.seqr);
 		}
 
-		gServer->GetEvents()->Call("ServerRPC.Callbacks.OnShoot", pActor->GetEntity()->GetScriptTable(), GetEntity()->GetScriptTable(), params.pos, params.hit, params.dir);
+		/*
+		const char* sAmmoClass = "";
+		if (IFireMode* pFM = GetActiveFireMode())
+			if (IEntityClass* pAmmo = pFM->GetAmmoType())
+				sAmmoClass = pAmmo->GetName();
+
+		*/
+
+		//EntityId ammoId = m_lastFiredAmmoId;
+		gServer->GetEvents()->Call("ServerRPC.Callbacks.OnShoot", pActor ? pActor->GetEntity()->GetScriptTable() : 0, GetEntity()->GetScriptTable(), ScriptHandle(m_lastFiredAmmoId), m_lastFiredAmmoClass, params.pos, params.hit, params.dir);
 		
 		// TODO: AC
 		//if (!gServer->GetAC()->CheckLongpoke(pActor, params.seq))
@@ -475,7 +525,8 @@ IMPLEMENT_RMI(CWeapon, SvRequestShoot)
 //------------------------------------------------------------------------
 IMPLEMENT_RMI(CWeapon, SvRequestShootEx)
 {
-	CHECK_OWNER_REQUEST();
+	//CHECK_OWNER_REQUEST();
+	CRYMP_OWNER_REQUEST();
 
 	bool ok=true;
 	CActor *pActor=GetActorByNetChannel(pNetChannel);
@@ -500,7 +551,7 @@ IMPLEMENT_RMI(CWeapon, SvRequestShootEx)
 			NetShootEx(params.pos, params.dir, params.vel, params.hit, params.extra, params.predictionHandle);
 
 		//CryLogAlways("nc");
-		gServer->GetEvents()->Call("ServerRPC.Callbacks.OnShoot", pActor ? pActor->GetEntity()->GetScriptTable() : 0, GetEntity()->GetScriptTable(), params.pos, params.hit, params.dir);
+		gServer->GetEvents()->Call("ServerRPC.Callbacks.OnShoot", pActor ? pActor->GetEntity()->GetScriptTable() : 0, GetEntity()->GetScriptTable(), ScriptHandle(m_lastFiredAmmoId), m_lastFiredAmmoClass, params.pos, params.hit, params.dir);
 
 		// TODO: AC
 		//if (!gServer->GetAC()->CheckLongpoke(pActor, params.seq))
@@ -538,7 +589,8 @@ IMPLEMENT_RMI(CWeapon, ClShootX)
 //------------------------------------------------------------------------
 IMPLEMENT_RMI(CWeapon, SvRequestStartMeleeAttack)
 {
-	CHECK_OWNER_REQUEST();
+	//CHECK_OWNER_REQUEST();
+	CRYMP_OWNER_REQUEST();
 
 	GetGameObject()->InvokeRMI(CWeapon::ClStartMeleeAttack(), params, eRMI_ToOtherClients, 
 		m_pGameFramework->GetGameChannelId(pNetChannel));
@@ -564,7 +616,8 @@ IMPLEMENT_RMI(CWeapon, ClStartMeleeAttack)
 //------------------------------------------------------------------------
 IMPLEMENT_RMI(CWeapon, SvRequestMeleeAttack)
 {
-	CHECK_OWNER_REQUEST();
+	//CHECK_OWNER_REQUEST();
+	CRYMP_OWNER_REQUEST();
 
 	bool ok=true;
 	CActor *pActor=GetActorByNetChannel(pNetChannel);
@@ -605,7 +658,8 @@ IMPLEMENT_RMI(CWeapon, ClMeleeAttack)
 //------------------------------------------------------------------------
 IMPLEMENT_RMI(CWeapon, SvRequestZoom)
 {
-	CHECK_OWNER_REQUEST();
+	//CHECK_OWNER_REQUEST();
+	CRYMP_OWNER_REQUEST();
 
 	bool ok=true;
 	CActor *pActor=GetActorByNetChannel(pNetChannel);
@@ -644,7 +698,8 @@ IMPLEMENT_RMI(CWeapon, ClZoom)
 //------------------------------------------------------------------------
 IMPLEMENT_RMI(CWeapon, SvRequestFireMode)
 {
-	CHECK_OWNER_REQUEST();
+	//CHECK_OWNER_REQUEST();
+	CRYMP_OWNER_REQUEST();
 
 	SetCurrentFireMode(params.id);
 
@@ -662,7 +717,8 @@ IMPLEMENT_RMI(CWeapon, ClSetFireMode)
 //------------------------------------------------------------------------
 IMPLEMENT_RMI(CWeapon, SvRequestReload)
 {
-	CHECK_OWNER_REQUEST();
+	//CHECK_OWNER_REQUEST();
+	CRYMP_OWNER_REQUEST();
 	
 	bool ok=true;
 	CActor *pActor=GetActorByNetChannel(pNetChannel);
@@ -710,7 +766,8 @@ IMPLEMENT_RMI(CWeapon, ClEndReload)
 //------------------------------------------------------------------------
 IMPLEMENT_RMI(CWeapon, SvRequestCancelReload)
 {
-	CHECK_OWNER_REQUEST();
+	//CHECK_OWNER_REQUEST();
+	CRYMP_OWNER_REQUEST();
 
 	if(m_fm)
 	{
@@ -752,7 +809,8 @@ IMPLEMENT_RMI(CWeapon, ClUnlock)
 //------------------------------------------------------------------------
 IMPLEMENT_RMI(CWeapon, SvRequestLock)
 {
-	CHECK_OWNER_REQUEST();
+	//CHECK_OWNER_REQUEST();
+	CRYMP_OWNER_REQUEST();
 
 	if (m_fm)
 		m_fm->Lock(params.entityId, params.partId);
@@ -765,7 +823,8 @@ IMPLEMENT_RMI(CWeapon, SvRequestLock)
 //------------------------------------------------------------------------
 IMPLEMENT_RMI(CWeapon, SvRequestUnlock)
 {
-	CHECK_OWNER_REQUEST();
+	//CHECK_OWNER_REQUEST();
+	CRYMP_OWNER_REQUEST();
 
 	if (m_fm)
 		m_fm->Unlock();
@@ -778,10 +837,17 @@ IMPLEMENT_RMI(CWeapon, SvRequestUnlock)
 //------------------------------------------------------------------------
 IMPLEMENT_RMI(CWeapon, SvRequestWeaponRaised)
 {
-	CHECK_OWNER_REQUEST();
+	//CHECK_OWNER_REQUEST();
+	CRYMP_OWNER_REQUEST();
+
+	// Server - Walljumps..
+	EntityId pOwnerId = GetOwnerId();
+	gServer->GetEvents()->Call("ServerRPC.Callbacks.OnWalljump", pOwnerId?ScriptHandle(pOwnerId):0, ScriptHandle(GetEntityId()));
+
+	// ...
+
 
 	GetGameObject()->InvokeRMI(CWeapon::ClWeaponRaised(), params, eRMI_ToAllClients);
-
 	return true;
 }
 

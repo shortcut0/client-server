@@ -8,12 +8,26 @@
 #include "CryGame/Game.h"
 #include "CryGame/GameCVars.h"
 
+// Server
+#include "CryMP/Server/ServerCVars.h"
+
 CNetPlayerInput::CNetPlayerInput(CPlayer* pPlayer) : m_pPlayer(pPlayer)
 {
 }
 
 void CNetPlayerInput::PreUpdate()
 {
+	/*
+	CryLogAlways("m_curInput.bodyDirection = {x=%f, y=%f, z=%f}", m_curInput.bodyDirection.x, m_curInput.bodyDirection.y, m_curInput.bodyDirection.z);
+	CryLogAlways("m_curInput.deltaMovement = {x=%f, y=%f, z=%f}", m_curInput.deltaMovement.x, m_curInput.deltaMovement.y, m_curInput.deltaMovement.z);
+	CryLogAlways("m_curInput.lookDirection = {x=%f, y=%f, z=%f}", m_curInput.lookDirection.x, m_curInput.lookDirection.y, m_curInput.lookDirection.z);
+	CryLogAlways("m_curInput.sprint        = %s", m_curInput.sprint ? "true" : "false");
+	CryLogAlways("m_curInput.leanl         = %s", m_curInput.leanl ? "true" : "false");
+	CryLogAlways("m_curInput.leanr         = %s", m_curInput.leanr ? "true" : "false");*/
+
+	//if (true) return;
+
+
 	const IPhysicalEntity *pPhysEnt = m_pPlayer->GetEntity()->GetPhysics();
 	if (!pPhysEnt)
 		return;
@@ -30,6 +44,7 @@ void CNetPlayerInput::PreUpdate()
 	Vec3 lookDirection(m_curInput.lookDirection);
 	m_pPlayer->m_netAimDir = lookDirection;
 
+	// --------------------------------------------------
 	//CryMP: FP Spectator uses interpolated lookDirection
 	if (m_pPlayer->IsFpSpectatorTarget())
 	{
@@ -64,8 +79,18 @@ void CNetPlayerInput::PreUpdate()
 		moveRequest.SetLean(lean);
 	else
 		moveRequest.ClearLean();
-
-	m_pPlayer->GetMovementController()->RequestMovement(moveRequest);
+	/*
+	moveRequest.ClearActorTarget();
+	moveRequest.SetDesiredSpeed(0.f);
+	moveRequest.SetMoveTarget(Vec3(0, 0, 0));
+	moveRequest.ClearMoveTarget();
+	moveRequest.ClearDesiredSpeed();
+	moveRequest.ClearFireTarget();
+	moveRequest.ClearJump();
+	moveRequest.ClearActorTarget();
+	moveRequest.ClearAimTarget();
+	moveRequest.ClearBodyTarget();	
+	*/
 
 	if (m_curInput.sprint)
 		m_pPlayer->m_actions |= ACTION_SPRINT;
@@ -81,6 +106,77 @@ void CNetPlayerInput::PreUpdate()
 		m_pPlayer->m_actions |= ACTION_LEANRIGHT;
 	else
 		m_pPlayer->m_actions &= ~ACTION_LEANRIGHT;
+
+
+	// Server: this somehow for some reason "resets" movement to register that the player is no longer moving!
+	// Esentially fixing the bug where the server wont recognize when the player stops moving while in spectator mode..
+	if (g_pServerCVars->server_fix_spectatorDesync > 0 && m_pPlayer && m_pPlayer->GetSpectatorMode() > 0) {
+
+		bool moving = m_curInput.deltaMovement.GetLength() > 0;
+		if (moving && m_moveReset) {
+			//CryLogAlways("move start..");
+			m_moveReset = false;
+		}
+
+		
+		if (!moving) {
+
+			if (!m_moveReset) {
+				Vec3 o_look = m_curInput.lookDirection;
+				Vec3 t_look = m_curInput.lookDirection;
+				t_look.x = o_look.x + 0.1;
+				t_look.y = o_look.y + 0.1;
+				t_look.z = o_look.z + 0.1;
+
+				CMovementRequest mr;
+				mr.AddDeltaMovement(Vec3(0, 0, 0));
+				mr.SetLookTarget(t_look);
+				mr.SetAimTarget(t_look);
+				m_pPlayer->GetMovementController()->RequestMovement(mr);
+				//mr.SetLookTarget(o_look);
+				//mr.SetAimTarget(o_look);
+				//m_pPlayer->GetMovementController()->RequestMovement(mr);
+
+				m_moveReset = true;
+				m_spectatorPos = m_pPlayer->GetEntity()->GetWorldPos() + deltaMovement * max(1.f, pseudoSpeed);
+
+				//CryLogAlways("move reset..");
+			}
+			else {
+				Quat rot = m_pPlayer->GetViewRotation();
+				m_pPlayer->GetEntity()->SetWorldTM(Matrix34::Create(Vec3(m_spectatorPos), rot, m_spectatorPos));
+
+
+				// Experimentals..
+
+				moveRequest.ClearActorTarget();
+				moveRequest.SetDesiredSpeed(0.f);
+				moveRequest.SetMoveTarget(Vec3(0, 0, 0));
+				moveRequest.ClearMoveTarget();
+				moveRequest.ClearDesiredSpeed();
+				moveRequest.ClearFireTarget();
+				moveRequest.ClearJump();
+				moveRequest.ClearActorTarget();
+				moveRequest.ClearAimTarget();
+				moveRequest.ClearBodyTarget();
+			}
+
+			/*
+				CryLogAlways("m_curInput.bodyDirection = {x=%f, y=%f, z=%f}", m_curInput.bodyDirection.x, m_curInput.bodyDirection.y, m_curInput.bodyDirection.z);
+				CryLogAlways("m_curInput.deltaMovement = {x=%f, y=%f, z=%f}", m_curInput.deltaMovement.x, m_curInput.deltaMovement.y, m_curInput.deltaMovement.z);
+				CryLogAlways("m_curInput.lookDirection = {x=%f, y=%f, z=%f}", m_curInput.lookDirection.x, m_curInput.lookDirection.y, m_curInput.lookDirection.z);
+				CryLogAlways("m_curInput.sprint        = %s", m_curInput.sprint ? "true" : "false");
+				CryLogAlways("m_curInput.leanl         = %s", m_curInput.leanl ? "true" : "false");
+				CryLogAlways("m_curInput.leanr         = %s", m_curInput.leanr ? "true" : "false");
+				*/
+		}
+	}
+
+
+
+
+	m_pPlayer->GetMovementController()->RequestMovement(moveRequest);
+	m_deltaLast = deltaMovement;
 }
 
 void CNetPlayerInput::Update()
@@ -93,6 +189,22 @@ void CNetPlayerInput::Update()
 
 		m_pPlayer->GetGameObject()->ChangedNetworkState(INPUT_ASPECT);
 	}
+	/*
+	// Server test
+	if (m_curInput.deltaMovement.GetLength() == 0) {
+		if (m_pPlayer)
+		{
+			CMovementRequest mr;
+			mr.ClearLookTarget();
+			m_pPlayer->GetMovementController()->RequestMovement(mr);
+
+			CryLogAlways("stop.!");
+		}
+	}*/
+
+	if (m_pPlayer)
+		m_pPlayer->m_netLookDirection = m_curInput.lookDirection;
+
 }
 
 void CNetPlayerInput::PostUpdate()
@@ -129,6 +241,9 @@ void CNetPlayerInput::DisableXI(bool disabled)
 
 void CNetPlayerInput::DoSetState(const SSerializedPlayerInput& input)
 {
+
+	//CryLogAlways("test > ", input.deltaMovement.x, input.deltaMovement.y, input.deltaMovement.z);
+
 	m_curInput = input;
 	m_pPlayer->GetGameObject()->ChangedNetworkState(INPUT_ASPECT);
 

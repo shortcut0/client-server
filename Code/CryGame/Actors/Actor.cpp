@@ -1321,8 +1321,13 @@ void CActor::ProcessEvent(SEntityEvent& event)
 
 void CActor::Update(SEntityUpdateContext& ctx, int slot)
 {
+
 	Vec3 cp = GetEntity()->GetWorldPos();
-	//CryLogAlways("%s::Update(current: %.2f,%.2f,%.2f)", GetEntity()->GetName(), cp.x,cp.y,cp.z);
+	//CryLogAlways("%s::Update(current: %.2f,%.2f,%.2f)", GetEntity()->GetName(), cp.x, cp.y, cp.z);
+	 
+	//if (true)
+	//	return;
+	// 
 	// ScreenFX only on client actor
 	if (IsClient() && m_screenEffects == 0)
 	{
@@ -1943,6 +1948,14 @@ void CActor::SetMaxHealth(int maxHealth)
 
 void CActor::Kill()
 {
+
+	// ======================================
+	// Server 
+	if (m_godMode > 0)
+		return;
+	// ======================================
+
+
 	if (m_pAnimatedCharacter)
 		m_pAnimatedCharacter->SetParams(m_pAnimatedCharacter->GetParams().ModifyFlags(0, eACF_EnableMovementProcessing));
 
@@ -2026,8 +2039,167 @@ bool CActor::IsClient() const
 }
 
 
-bool CActor::SetAspectProfile(EEntityAspects aspect, uint8 profile)
+bool CActor::SetAspectProfile_ORIGINAL(EEntityAspects aspect, uint8 profile)
 {
+	bool res(false);
+
+	if (aspect == eEA_Physics)
+	{
+		/*CryLog("%s::SetProfile(%d): %s (was: %d %s)", GetEntity()->GetName(),
+			profile, profile==eAP_Alive?"alive":(profile==eAP_Ragdoll?"ragdoll":(profile==eAP_Spectator?"spectator":(profile==eAP_Frozen?"frozen":"unknown"))),
+			m_currentPhysProfile, m_currentPhysProfile==eAP_Alive?"alive":(m_currentPhysProfile==eAP_Ragdoll?"ragdoll":(m_currentPhysProfile==eAP_Spectator?"spectator":(m_currentPhysProfile==eAP_Frozen?"frozen":"unknown"))));
+*/
+		if (m_currentPhysProfile == profile && !gEnv->pSystem->IsSerializingFile()) //rephysicalize when loading savegame
+			return true;
+
+		bool wasFrozen = (m_currentPhysProfile == eAP_Frozen);
+
+		switch (profile)
+		{
+		case eAP_NotPhysicalized:
+		{
+			SEntityPhysicalizeParams params;
+			params.type = PE_NONE;
+			GetEntity()->Physicalize(params);
+		}
+		res = true;
+		break;
+		case eAP_Spectator:
+		case eAP_Alive:
+		{
+			// if we were asleep, we just want to wakeup
+			if (profile == eAP_Alive && (m_currentPhysProfile == eAP_Sleep))
+			{
+				ICharacterInstance* pCharacter = GetEntity()->GetCharacter(0);
+				if (pCharacter && pCharacter->GetISkeletonAnim())
+				{
+					IPhysicalEntity* pPhysicalEntity = 0;
+					Matrix34 delta(IDENTITY);
+
+					pCharacter->GetISkeletonPose()->StandUp(GetEntity()->GetWorldTM(), false, pPhysicalEntity, delta);
+
+					if (pPhysicalEntity)
+					{
+						IEntityPhysicalProxy* pPhysicsProxy = static_cast<IEntityPhysicalProxy*>(GetEntity()->GetProxy(ENTITY_PROXY_PHYSICS));
+						if (pPhysicsProxy)
+						{
+							GetEntity()->SetWorldTM(delta);
+							pPhysicsProxy->AssignPhysicalEntity(pPhysicalEntity);
+						}
+					}
+					m_pAnimatedCharacter->ForceTeleportAnimationToEntity();
+					m_pAnimatedCharacter->ForceRefreshPhysicalColliderMode();
+				}
+			}
+			else
+			{
+				Physicalize(wasFrozen ? STANCE_PRONE : STANCE_NULL);
+
+				if (profile == eAP_Spectator)
+				{
+					if (ICharacterInstance* pCharacter = GetEntity()->GetCharacter(0))
+						pCharacter->GetISkeletonPose()->DestroyCharacterPhysics(1);
+					m_pAnimatedCharacter->ForceRefreshPhysicalColliderMode();
+					m_pAnimatedCharacter->RequestPhysicalColliderMode(eColliderMode_Spectator, eColliderModeLayer_Game, "Actor::SetAspectProfile");
+				}
+				else if (profile == eAP_Alive)
+				{
+					if (m_currentPhysProfile == eAP_Spectator)
+					{
+						m_pAnimatedCharacter->RequestPhysicalColliderMode(eColliderMode_Undefined, eColliderModeLayer_Game, "Actor::SetAspectProfile");
+						if (IPhysicalEntity* pPhysics = GetEntity()->GetPhysics())
+						{
+							if (ICharacterInstance* pCharacter = GetEntity()->GetCharacter(0))
+							{
+								pCharacter->GetISkeletonPose()->DestroyCharacterPhysics(2);
+
+								if (IPhysicalEntity* pCharPhysics = pCharacter->GetISkeletonPose()->GetCharacterPhysics())
+								{
+									pe_params_articulated_body body;
+									body.pHost = pPhysics;
+									pCharPhysics->SetParams(&body);
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		res = true;
+		break;
+		case eAP_Linked:
+			// make sure we are alive, for when we transition from ragdoll to linked...
+			if (!GetEntity()->GetPhysics() || GetEntity()->GetPhysics()->GetType() != PE_LIVING)
+				Physicalize();
+			res = true;
+			break;
+		case eAP_Sleep:
+			RagDollize(true);
+			res = true;
+			break;
+		case eAP_Ragdoll:
+			// killed while sleeping?
+			if (m_currentPhysProfile == eAP_Sleep)
+				GoLimp();
+			else
+				RagDollize(false);
+			res = true;
+			break;
+		case eAP_Frozen:
+			if (!GetEntity()->GetPhysics() || ((GetEntity()->GetPhysics()->GetType() != PE_LIVING) && (GetEntity()->GetPhysics()->GetType() != PE_ARTICULATED)))
+				Physicalize();
+			Freeze(true);
+			res = true;
+			break;
+		}
+
+		IPhysicalEntity* pPE = GetEntity()->GetPhysics();
+		pe_player_dynamics pdyn;
+
+		if (profile != eAP_Frozen && wasFrozen)
+		{
+			Freeze(false);
+
+			if (profile == eAP_Alive)
+			{
+				EStance stance;
+				if (!TrySetStance(stance = STANCE_STAND))
+					if (!TrySetStance(stance = STANCE_CROUCH))
+					{
+						pdyn.bActive = 0;
+						pPE->SetParams(&pdyn);
+
+						if (!TrySetStance(stance = STANCE_PRONE))
+							stance = STANCE_NULL;
+
+						pdyn.bActive = 1;
+						pPE->SetParams(&pdyn);
+					}
+
+				if (stance != STANCE_NULL)
+				{
+					m_stance = STANCE_NULL;
+					m_desiredStance = stance;
+
+					UpdateStance();
+				}
+
+				GetGameObject()->ChangedNetworkState(IPlayerInput::INPUT_ASPECT);
+			}
+		}
+
+		if (res)
+			ProfileChanged(profile);
+
+		m_currentPhysProfile = profile;
+	}
+
+	return res;
+}
+
+bool CActor::SetAspectProfile_CryMP(EEntityAspects aspect, uint8 profile)
+{
+
 	bool res(false);
 
 	if (aspect == eEA_Physics)
@@ -2211,6 +2383,24 @@ bool CActor::SetAspectProfile(EEntityAspects aspect, uint8 profile)
 	}
 
 	return res;
+
+	
+}
+
+bool CActor::SetAspectProfile(EEntityAspects aspect, uint8 profile)
+{
+
+	// ------------------------
+	// SERVER
+	if (g_pServerCVars->server_fix_spectatorDesync > 0) {
+		//CryLogAlways("Executing original aspect profiler");
+		return SetAspectProfile_ORIGINAL(aspect, profile);
+	}
+
+	//CryLogAlways("Executing crymp aspect profiler...");
+	return SetAspectProfile_CryMP(aspect, profile);
+
+	
 }
 
 
@@ -3409,8 +3599,12 @@ void CActor::SetSleepTimer(float timer)
 //------------------------------------------------------------------------
 IMPLEMENT_RMI(CActor, SvRequestDropItem)
 {
+
+	if (!gServer->GetAC()->CheckOwnerRequest(pNetChannel, GetEntityId(), "RMI Spoof", __FUNCTION__, params.itemId ? ScriptHandle(params.itemId) : 0))
+		return false;
 	// ---------------------------------------
 	// Server
+	/*
 	uint16 pChannelId = m_pGameFramework->GetGameChannelId(pNetChannel);
 	if (!pChannelId) {
 		return false;
@@ -3433,7 +3627,7 @@ IMPLEMENT_RMI(CActor, SvRequestDropItem)
 	if (gServer->GetEvents()->Get("ServerRPC.Callbacks.CanDropWeapon", ok, ScriptHandle(GetEntityId()), ScriptHandle(params.itemId)) && !ok) {
 		return true;
 	}
-
+	*/
 	// ...
 	// ---------------------------------------
 
@@ -3460,6 +3654,11 @@ IMPLEMENT_RMI(CActor, SvRequestPickUpItem)
 
 	// ---------------------------------------
 	// Server
+
+	if (!gServer->GetAC()->CheckOwnerRequest(pNetChannel, GetEntityId(), "RMI Spoof", __FUNCTION__, params.itemId ? ScriptHandle(params.itemId) : 0))
+		return false;
+
+	/*
 	uint16 pChannelId = m_pGameFramework->GetGameChannelId(pNetChannel);
 	if (!pChannelId) {
 		return false;
@@ -3475,7 +3674,7 @@ IMPLEMENT_RMI(CActor, SvRequestPickUpItem)
 	if (pActorId != pNetId) {
 		gServer->GetEvents()->Call("ServerRPC.Callbacks.OnCheat", pChannelId, "RMI Spoof (SvRequestPickupItem)", ScriptHandle(GetEntityId()), ScriptHandle(params.itemId));
 		return false;
-	}
+	}*/
 	// ...
 	// ---------------------------------------
 
@@ -3491,9 +3690,23 @@ IMPLEMENT_RMI(CActor, SvRequestPickUpItem)
 			{
 				if (IGameObject* pGameObject = m_pGameFramework->GetGameObject(params.itemId))
 				{
+
+					// Server (Update the "owner" of the item!)
+					IEntity* pHeldObject = gEnv->pEntitySystem->GetEntity(params.itemId);
+					if (pHeldObject)
+						if (IScriptTable* pHeldObjectLua = pHeldObject->GetScriptTable())
+							pHeldObjectLua->SetValue("OwnerID", ScriptHandle(GetEntityId()));
+					// ...
+					
+					bool ok = true;
+					if (!gServer->GetEvents()->Get("ServerRPC.Callbacks.CanPickObject", ok, ScriptHandle(GetEntityId()), ScriptHandle(params.itemId)) || !ok) {
+					//	GetGameObject()->InvokeRMIWithDependentObject(CActor::ClDrop(), CActor::DropItemParams(params.itemId, 1, true, false), eRMI_ToAllClients | eRMI_NoLocalCalls, GetEntityId());
+						//GetGameObject()->InvokeRMIWithDependentObject(CActor::ClDrop(), CActor::PickItemParams(params.itemId, false, false), eRMI_ToAllClients | eRMI_NoLocalCalls, params.itemId);
+						return true;
+					}
+
 					m_pGameFramework->GetNetContext()->DelegateAuthority(params.itemId, pNetChannel);
 					SetHeldObjectId(params.itemId);
-
 					GetGameObject()->InvokeRMIWithDependentObject(CActor::ClPickUp(), CActor::PickItemParams(params.itemId, false, false), eRMI_ToAllClients | eRMI_NoLocalCalls, params.itemId);
 				}
 			}
@@ -3524,6 +3737,13 @@ IMPLEMENT_RMI(CActor, SvRequestUseItem)
 {
 	// ---------------------------------------
 	// Server
+
+	if (!gServer->GetAC()->CheckOwnerRequest(pNetChannel, GetEntityId(), "RMI Spoof", __FUNCTION__, params.itemId ? ScriptHandle(params.itemId) : 0))
+		return false;
+
+	// ...
+
+	/*
 	uint16 pChannelId = m_pGameFramework->GetGameChannelId(pNetChannel);
 	if (!pChannelId) {
 		return false;
@@ -3539,7 +3759,7 @@ IMPLEMENT_RMI(CActor, SvRequestUseItem)
 	if (pActorId != pNetId) {
 		gServer->GetEvents()->Call("ServerRPC.Callbacks.OnCheat", pChannelId, "RMI Spoof (SvRequestUseItem)", ScriptHandle(GetEntityId()), ScriptHandle(params.itemId));
 		return false;
-	}
+	}*/
 
 	// Server
 	bool ok = true;
@@ -3681,6 +3901,13 @@ void CActor::NetReviveInVehicle(EntityId vehicleId, int seatId, int teamId)
 //------------------------------------------------------------------------
 void CActor::NetKill(EntityId shooterId, uint16 weaponClassId, int damage, int material, int hit_type)
 {
+
+	// ======================================
+	// Server 
+	if (m_godMode > 0)
+		return;
+	// ======================================
+
 	static char weaponClassName[129] = { 0 };
 	m_pGameFramework->GetNetworkSafeClassName(weaponClassName, 128, weaponClassId);
 

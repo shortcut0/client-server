@@ -165,6 +165,9 @@ CScriptBind_Actor::CScriptBind_Actor(ISystem* pSystem)
 	//Server:
 	SCRIPT_REG_FUNC(GetVehicleViewDir);
 	SCRIPT_REG_FUNC(GetRotation);
+	SCRIPT_REG_FUNC(GetLookDirection);
+	SCRIPT_REG_FUNC(GetNetAimDir);
+	SCRIPT_REG_FUNC(GetLean);
 	SCRIPT_REG_TEMPLFUNC(SetGodMode, "mode");
 	SCRIPT_REG_TEMPLFUNC(SetActorMode, "mode, value");
 
@@ -190,6 +193,9 @@ CScriptBind_Actor::CScriptBind_Actor(ISystem* pSystem)
 	// SERVER
 	m_pSS->SetGlobalValue("ACTORMODE_UNLIMITEDAMMO", 1);
 	m_pSS->SetGlobalValue("ACTORMODE_UNLIMITEDITEMS", 2);
+
+	m_pSS->SetGlobalValue("LEAN_RIGHT", 1);
+	m_pSS->SetGlobalValue("LEAN_LEFT", -1);
 }
 
 //------------------------------------------------------------------------
@@ -226,6 +232,24 @@ CActor* CScriptBind_Actor::GetActor(IFunctionHandler* pH)
 	}
 
 	return 0;
+}
+
+
+//------------------------------------------------------------------------
+// SERVER
+int CScriptBind_Actor::GetLean(IFunctionHandler* pH)
+{
+	CActor* pActor = GetActor(pH);
+	if (!pActor)
+		return pH->EndFunction();
+
+	if (IMovementController* pMC = pActor->GetMovementController()) {
+		SMovementState ms;
+		pMC->GetMovementState(ms);
+		return pH->EndFunction(ms.lean);
+	}
+
+	return pH->EndFunction();
 }
 
 
@@ -277,6 +301,32 @@ int CScriptBind_Actor::GetVehicleViewDir(IFunctionHandler* pH)
 		return pH->EndFunction();
 
 	Vec3 dir = ((CPlayer*)pActor)->GetVehicleViewDir();
+	return pH->EndFunction(dir);
+}
+
+
+//------------------------------------------------------------------------
+// SERVER
+int CScriptBind_Actor::GetLookDirection(IFunctionHandler* pH)
+{
+	CActor* pActor = GetActor(pH);
+	if (!pActor)
+		return pH->EndFunction();
+
+	Vec3 dir = ((CPlayer*)pActor)->m_netLookDirection;
+	return pH->EndFunction(dir);
+}
+
+
+//------------------------------------------------------------------------
+// SERVER
+int CScriptBind_Actor::GetNetAimDir(IFunctionHandler* pH)
+{
+	CActor* pActor = GetActor(pH);
+	if (!pActor)
+		return pH->EndFunction();
+
+	Vec3 dir = ((CPlayer*)pActor)->GetNetAimDir();
 	return pH->EndFunction(dir);
 }
 

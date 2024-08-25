@@ -332,8 +332,21 @@ void CScan::NetShoot(const Vec3 &hit, int ph)
 					if (pSuit && pSuit->GetMode()==NANOMODE_CLOAK && pSuit->GetCloak()->GetType()==CLOAKMODE_REFRACTION)
 						continue;
 				}
-				else*/ if(IItem *pItem = g_pGame->GetIGameFramework()->GetIItemSystem()->GetItem(pEntity->GetId()))
-					continue;
+				else*/ 
+				
+				bool itemok = false;
+				if (IEntityClass* pcls = pEntity->GetClass())
+				{
+					const char* scls = pcls->GetName();
+					CryLogAlways("scls=%s", scls);
+					if (strcmp(scls, "avexplosive") == 0 || strcmp(scls, "claymoreexplosive") == 0 || strcmp(scls,"c4explosive") == 0)
+						itemok = g_pServerCVars->server_allow_scan_explosives > 0;
+				}
+				
+				if(IItem *pItem = g_pGame->GetIGameFramework()->GetIItemSystem()->GetItem(pEntity->GetId()))
+					if (!itemok)
+						continue;
+
 
 				g_pGame->GetGameRules()->AddTaggedEntity(ownerId, pEntity->GetId(), true);
 			}

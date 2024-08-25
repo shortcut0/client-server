@@ -107,6 +107,7 @@ void CPlayerMovementController::Reset()
 
 bool CPlayerMovementController::RequestMovement(CMovementRequest& request)
 {
+
 	if (!m_pPlayer->IsPlayer())
 	{
 		if (IVehicle* pVehicle = m_pPlayer->GetLinkedVehicle())

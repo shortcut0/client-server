@@ -46,6 +46,10 @@ public:
 	CProjectile();
 	virtual ~CProjectile();
 
+	// --------------------------------------------------------------
+	// Server
+	virtual void SetOwnerId(EntityId newOwnerId);
+
 	// IGameObjectExtension
 	virtual bool Init(IGameObject *pGameObject);
 	virtual void InitClient(int channelId) {};

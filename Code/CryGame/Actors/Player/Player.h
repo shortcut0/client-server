@@ -295,6 +295,13 @@ class CPlayer :
 
 public:
 
+
+	// --------------------------------------------
+	// Server
+
+	Vec3 m_netLookDirection;
+	// --------------------------------------------
+
 	enum EPlayerSounds //most of these sounds are supposed to be played, when the nanosuit is not in use
 	{
 		ESound_Player_First,
@@ -887,13 +894,17 @@ public:
 //CryMP 
 //////////////////////////////////////////////////////////////////////////////////
 
+
+public:
+
+	Vec3 m_vehicleViewDirSmooth = Vec3(ZERO);
+	Vec3 m_netAimDir = Vec3(ZERO);
+	Vec3 m_netAimDirSmooth = Vec3(ZERO);
+
 protected:
 
 	float m_tpLeanOffset = 0.0f;
 	float m_tpProneOffset = 0.0f;
-	Vec3 m_vehicleViewDirSmooth = Vec3(ZERO);
-	Vec3 m_netAimDir = Vec3(ZERO);
-	Vec3 m_netAimDirSmooth = Vec3(ZERO);
 	bool m_bSlowCamera = false;
 	bool GetAimTargetAdjusted(Vec3& aimTarget);
 

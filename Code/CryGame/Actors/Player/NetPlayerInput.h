@@ -14,6 +14,14 @@ class CPlayer;
 class CNetPlayerInput : public IPlayerInput
 {
 public:
+
+	// -----------------------------
+	// Server
+	bool m_moveReset = false;
+	Vec3 m_spectatorPos;
+	Vec3 m_deltaLast;
+
+
 	CNetPlayerInput( CPlayer * pPlayer );
 
 	// IPlayerInput

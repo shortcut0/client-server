@@ -10,6 +10,17 @@
 #include "Library/Util.h"
 #include "Library/WinAPI.h"
 
+
+//#include "CryCommon/CrySystem/ISystem.h"
+//#include "CryCommon/CryPhysics/IPhysics.h"
+//#include "CryCommon/Cry3DEngine/I3DEngine.h"
+#include "CryCommon/Cry3DEngine/IFoliage.h"
+//#include "CryCommon/CryEntitySystem/IEntitySystem.h"
+
+#include "CryGame/Game.h"
+#include "CryGame/Items/Weapons/WeaponSystem.h"
+#include "CryGame/Items/Weapons/Projectile.h"
+
 // -------------------------------------
 #include "ScriptBind_Server.h"
 #include "Server.h"
@@ -76,9 +87,16 @@ ScriptBind_Server::ScriptBind_Server()
 	SCRIPT_REG_TEMPLFUNC(GetLevels, "");   // Returns all available levels
 	SCRIPT_REG_TEMPLFUNC(IsValidEntityClass, "class");   // Returns true if specified entity class is valid (exists)
 	SCRIPT_REG_TEMPLFUNC(IsValidItemClass, "class");   // Returns true if specified entity class is valid (exists)
+	SCRIPT_REG_TEMPLFUNC(GetScriptPath, "class");   // Returns true if specified entity class is valid (exists)
 	SCRIPT_REG_FUNC(GetEntityClasses);   // Returns true if specified entity class is valid (exists)
 	SCRIPT_REG_FUNC(GetItemClasses);   // Returns true if specified entity class is valid (exists)
 	SCRIPT_REG_FUNC(GetVehicleClasses);   // Returns true if specified entity class is valid (exists)
+	SCRIPT_REG_TEMPLFUNC(GetProjectileOwnerId, "id");   // Returns true if specified entity class is valid (exists)
+	SCRIPT_REG_TEMPLFUNC(GetProjectilePos, "id");   // Returns true if specified entity class is valid (exists)
+	SCRIPT_REG_TEMPLFUNC(SetProjectilePos, "id, pos");   // Returns true if specified entity class is valid (exists)
+	
+	// Crash-prone copy of Physics.RayworldIntersection
+	SCRIPT_REG_FUNC(RayWorldIntersection);
 
 	// Network
 	SCRIPT_REG_TEMPLFUNC(Request, "params, callback");
@@ -96,6 +114,170 @@ ScriptBind_Server::ScriptBind_Server()
 // -------------------------------------
 ScriptBind_Server::~ScriptBind_Server()
 {
+}
+
+// --------------------------------------------------------------------------------
+// Describe this
+int ScriptBind_Server::RayWorldIntersection(IFunctionHandler* pH)
+{
+	assert(pH->GetParamCount() >= 3 && pH->GetParamCount() <= 7);
+
+	Vec3 vPos(0, 0, 0);
+	Vec3 vDir(0, 0, 0);
+	ScriptHandle skipId1;
+	ScriptHandle skipId2;
+	IEntity* skipEnt1 = nullptr;
+	IEntity* skipEnt2 = nullptr;
+	int nMaxHits = 0;
+	int iEntTypes = ent_all;
+
+	SmartScriptTable hitTable(m_pSS);
+
+	if (!pH->GetParams(vPos, vDir, nMaxHits, iEntTypes))
+		return pH->EndFunction();
+
+
+	// [crashprone]
+	if (nMaxHits < 1) nMaxHits = 1; if (nMaxHits > 10) nMaxHits = 10;
+
+	int nParams = pH->GetParamCount();
+
+	if (nParams >= 5 && pH->GetParamType(5) != svtNull && pH->GetParam(5, skipId1))
+		skipEnt1 = gEnv->pEntitySystem->GetEntity(static_cast<EntityId>(skipId1.n));
+
+	if (nParams >= 6 && pH->GetParamType(6) != svtNull && pH->GetParam(6, skipId2))
+		skipEnt2 = gEnv->pEntitySystem->GetEntity(static_cast<EntityId>(skipId2.n));
+
+	bool bHitTablePassed = (nParams >= 7);
+
+	if (bHitTablePassed)
+		pH->GetParam(7, hitTable);
+
+
+
+	ray_hit RayHit[10];
+	int skipIdCount = 0;
+	IPhysicalEntity* skipPhys[2] = { nullptr, nullptr };
+
+	if (skipEnt1)
+	{
+		++skipIdCount;
+		skipPhys[0] = skipEnt1->GetPhysics();
+	}
+
+	if (skipEnt2)
+	{
+		++skipIdCount;
+		skipPhys[1] = skipEnt2->GetPhysics();
+	}
+
+	const int flags = geom_colltype0 << rwi_colltype_bit | rwi_stop_at_pierceable;
+
+	int nHits = gEnv->pPhysicalWorld->RayWorldIntersection(vPos, vDir, iEntTypes, flags, RayHit, nMaxHits, skipPhys, skipIdCount);
+
+	for (int i = 0; i < nHits; i++)
+	{
+		SmartScriptTable pHitObj(m_pSS);
+		ray_hit& Hit = RayHit[i];
+		pHitObj->SetValue("pos", Hit.pt);
+		pHitObj->SetValue("normal", Hit.n);
+		pHitObj->SetValue("dist", Hit.dist);
+		pHitObj->SetValue("surface", Hit.surface_idx);
+
+		IEntity* pEntity = (IEntity*)Hit.pCollider->GetForeignData(PHYS_FOREIGN_ID_ENTITY);
+		if (pEntity)
+		{
+			pHitObj->SetValue("entity", pEntity->GetScriptTable());
+		}
+		else
+		{
+			if (Hit.pCollider->GetiForeignData() == PHYS_FOREIGN_ID_STATIC)
+			{
+				IRenderNode* pRN = (IRenderNode*)Hit.pCollider->GetForeignData(PHYS_FOREIGN_ID_STATIC);
+				if (pRN)
+					pHitObj->SetValue("renderNode", ScriptHandle(pRN));
+			}
+			else if (Hit.pCollider->GetiForeignData() == PHYS_FOREIGN_ID_FOLIAGE)
+			{
+				IRenderNode* pRN = ((IFoliage*)Hit.pCollider->GetForeignData(PHYS_FOREIGN_ID_FOLIAGE))->GetIRenderNode();
+				if (pRN)
+					pHitObj->SetValue("renderNode", ScriptHandle(pRN));
+			}
+		}
+
+		hitTable->SetAt(i + 1, pHitObj);
+	}
+
+	if (bHitTablePassed)
+		return pH->EndFunction(nHits);
+
+	return pH->EndFunction(*hitTable);
+}
+
+// --------------------------------------------------------------------------------
+// Describe this
+int ScriptBind_Server::SetProjectilePos(IFunctionHandler* pH, ScriptHandle id, Vec3 pos)
+{
+	
+	EntityId projectileId(id.n);
+	if (!projectileId)
+		return pH->EndFunction(false);
+
+	if (CProjectile* pProjectile = g_pGame->GetWeaponSystem()->GetProjectile(projectileId)) {
+		//fixme
+	}
+
+	return pH->EndFunction(false);
+}
+
+// --------------------------------------------------------------------------------
+// Describe this
+int ScriptBind_Server::GetProjectilePos(IFunctionHandler* pH, ScriptHandle id)
+{
+	
+	EntityId projectileId(id.n);
+	if (!projectileId)
+		return pH->EndFunction(false);
+
+	if (CProjectile* pProjectile = g_pGame->GetWeaponSystem()->GetProjectile(projectileId)) {
+		
+		return pH->EndFunction(pProjectile->GetEntity()->GetPos());
+	}
+
+	return pH->EndFunction(false);
+}
+
+// --------------------------------------------------------------------------------
+// Describe this
+int ScriptBind_Server::SetProjectileOwnerId(IFunctionHandler* pH, ScriptHandle id, ScriptHandle ownerId)
+{
+	
+	EntityId pOwnerId(ownerId.n);
+	EntityId projectileId(id.n);
+	if (!projectileId)
+		return pH->EndFunction(false);
+
+	if (CProjectile* pProjectile = g_pGame->GetWeaponSystem()->GetProjectile(projectileId)) {
+		pProjectile->SetOwnerId(pOwnerId);
+		return pH->EndFunction(true);
+	}
+
+	return pH->EndFunction(false);
+}
+
+// --------------------------------------------------------------------------------
+// Describe this
+int ScriptBind_Server::GetProjectileOwnerId(IFunctionHandler* pH, ScriptHandle id)
+{
+	
+	EntityId projectileId(id.n);
+	if (!projectileId)
+		return pH->EndFunction();
+
+	if (CProjectile *pProjectile = g_pGame->GetWeaponSystem()->GetProjectile(projectileId))
+		return pH->EndFunction(ScriptHandle(pProjectile->GetOwnerId()));
+
+	return pH->EndFunction();
 }
 
 // --------------------------------------------------------------------------------
@@ -140,6 +322,22 @@ int ScriptBind_Server::FSetCVar(IFunctionHandler* pH, const char* cvar, const ch
 	// all good!
 	return pH->EndFunction(true);
 }
+
+// --------------------------------------------------------------------------------
+// Describe this
+int ScriptBind_Server::GetScriptPath(IFunctionHandler* pH, const char* sClass) {
+
+
+	IEntityClassRegistry* pEntityRegistry = gEnv->pEntitySystem->GetClassRegistry();
+	if (!pEntityRegistry)
+		return pH->EndFunction();
+
+	if (IEntityClass* pClass = pEntityRegistry->FindClass(sClass))
+		return pH->EndFunction(pClass->GetScriptFile());
+
+	return pH->EndFunction();
+}
+
 
 // --------------------------------------------------------------------------------
 // Describe this
