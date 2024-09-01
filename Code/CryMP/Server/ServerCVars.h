@@ -27,8 +27,11 @@ struct ServerCVars {
 	int server_c4_stickToAllSpecies;
 	int server_c4_stickLimitOne;
 	int server_fix_spectatorDesync;
+	float server_spectatorFix_ResetThreshold;
 	float server_anticheat_weaponCheckInterval;
 	int server_allow_scan_explosives;
+	int server_allow_scan_cloaked;
+
 
 	// Commands
 	ICVar *server_mapTitle;

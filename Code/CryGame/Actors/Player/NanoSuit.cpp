@@ -620,10 +620,15 @@ void CNanoSuit::SetSuitEnergy(float value, bool playerInitiated /* = false */)
 	if (!m_pOwner)
 		return;
 
+	bool god = m_pOwner&&m_pOwner->m_godMode > 0;
+
 	// Server (God Mode)
 	if (value < NANOSUIT_ENERGY) {
-		if (m_pOwner->m_godMode > 0)
+		if (god) {
 			value = NANOSUIT_ENERGY;
+			if (value == m_energy)
+				value -= 1;
+		}
 	} // ...
 
 	value = clamp(value, 0.0f, NANOSUIT_ENERGY);
@@ -675,7 +680,7 @@ void CNanoSuit::SetSuitEnergy(float value, bool playerInitiated /* = false */)
 		}
 
 		// spending energy cancels invulnerability
-		if (m_invulnerable && gEnv->bServer)
+		if (!god && m_invulnerable && gEnv->bServer)
 			SetInvulnerability(false);
 	}
 

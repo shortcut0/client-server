@@ -53,6 +53,7 @@ public:
 	int SetProjectileOwnerId(IFunctionHandler* pH, ScriptHandle id, ScriptHandle ownerId);
 	int GetProjectilePos(IFunctionHandler* pH, ScriptHandle id);
 	int SetProjectilePos(IFunctionHandler* pH, ScriptHandle id, Vec3 pos);
+	int ExplodeProjectile(IFunctionHandler* pH, ScriptHandle id);
 
 	int RayWorldIntersection(IFunctionHandler* pH);
 

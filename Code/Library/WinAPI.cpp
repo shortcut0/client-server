@@ -988,10 +988,11 @@ int WinAPI::HTTPRequest(
 		throw StringTools::SysErrorFormat("WinHttpOpen");
 	}
 
+	/*
 	if (!WinHttpSetTimeouts(hSession, timeout, timeout, timeout, timeout))
 	{
 		throw StringTools::SysErrorFormat("WinHttpSetTimeouts");
-	}
+	}*/
 
 	const std::wstring serverNameW(urlComponents.lpszHostName, urlComponents.dwHostNameLength);
 

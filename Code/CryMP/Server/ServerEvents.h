@@ -48,7 +48,8 @@ class ServerEvents : public IWeaponEventListener
 	}
 
 	// --------------------
-	std::pair<SmartScriptTable, HSCRIPTFUNCTION> GetFunc(const std::string& host);
+	std::pair<SmartScriptTable, SmartScriptFunction> GetFunc(const std::string& host);
+	//bool GetFuncEx(const std::string& host, SmartScriptFunction& outFunc, SmartScriptTable& outTable);
 	
 private:
 
@@ -106,17 +107,16 @@ public:
 	bool Get(const std::string& handle, Ret &ret, const Params &... params)
 	{
 
-		std::pair<SmartScriptTable, HSCRIPTFUNCTION> map = GetFunc(handle);
+		//std::pair<SmartScriptTable, SmartScriptFunction> map = GetFunc(handle);
 
-		HSCRIPTFUNCTION pFunc = map.second;
-		SmartScriptTable pHost = map.first;
-
-		if (pFunc == nullptr) {return false;}
+		//SmartScriptFunction pFunc = std::move(map.second);
+		//SmartScriptTable pHost = map.first;
+		auto [pHost, pFunc] = GetFunc(handle);
 
 		bool bOk = true;
 		if (pFunc && m_pSS->BeginCall(pFunc))
 		{
-			if (pHost != nullptr)
+			if (pHost)
 				m_pSS->PushFuncParam(pHost); // push host (self in lua)
 
 			(m_pSS->PushFuncParam(params), ...);
@@ -125,7 +125,7 @@ public:
 		else
 			bOk = false;
 
-		m_pSS->ReleaseFunc(pFunc);
+		//m_pSS->ReleaseFunc(pFunc);
 		return bOk;
 	}
 
@@ -133,12 +133,14 @@ public:
 	bool Call(const std::string& handle, const Params &... params)
 	{
 
-		std::pair<SmartScriptTable, HSCRIPTFUNCTION> map = GetFunc(handle);
+		//std::pair<SmartScriptTable, SmartScriptFunction> map = GetFunc(handle);
 
-		HSCRIPTFUNCTION pFunc = map.second;
-		SmartScriptTable pHost = map.first;
+		//SmartScriptFunction pFunc = std::move(map.second);
+		//SmartScriptTable pHost = map.first;
 
-		if (pFunc == nullptr) {
+		auto [pHost, pFunc] = GetFunc(handle);
+
+		if (!pFunc) {
 			CryLogAlways("Function handle is nullptr");
 			return false;
 		}
@@ -155,7 +157,7 @@ public:
 		else
 			bOk = false;
 
-		m_pSS->ReleaseFunc(pFunc);
+		//m_pSS->ReleaseFunc(pFunc);
 		return bOk;
 	}
 

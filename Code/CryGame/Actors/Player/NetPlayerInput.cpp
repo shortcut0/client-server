@@ -143,6 +143,12 @@ void CNetPlayerInput::PreUpdate()
 				//CryLogAlways("move reset..");
 			}
 			else {
+
+
+				if (m_spectatorPos.GetDistance(m_pPlayer->GetEntity()->GetWorldPos()) > g_pServerCVars->server_spectatorFix_ResetThreshold) {
+					m_spectatorPos = m_pPlayer->GetEntity()->GetWorldPos();
+				}
+
 				Quat rot = m_pPlayer->GetViewRotation();
 				m_pPlayer->GetEntity()->SetWorldTM(Matrix34::Create(Vec3(m_spectatorPos), rot, m_spectatorPos));
 

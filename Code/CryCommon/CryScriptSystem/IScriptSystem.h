@@ -93,6 +93,8 @@ struct ScriptAnyValue
 	ScriptAnyValue( const Ang3 &value ) : type(ANY_TVECTOR) { vec3.x=value.x; vec3.y=value.y; vec3.z=value.z; };
 	ScriptAnyValue( IScriptTable *value ); // implemented at the end of header
 	ScriptAnyValue( const SmartScriptTable &value ); // implemented at the end of header
+	//Server
+	//ScriptAnyValue(const SmartScriptFunction& value);
 
 	ScriptAnyValue( const ScriptAnyValue& value ); // implemented at the end of header
 	void Swap( ScriptAnyValue& value ); // implemented at the end of header
@@ -125,7 +127,7 @@ struct ScriptAnyValue
 	bool CopyTo( Ang3 &value ) { if (type==ANY_TVECTOR) { value.x=vec3.x;value.y=vec3.y;value.z=vec3.z; return true; }; return false; };
 	bool CopyTo( IScriptTable *value ); // implemented at the end of header
 	bool CopyTo( SmartScriptTable &value ); // implemented at the end of header
-
+	//bool CopyTo(SmartScriptFunction& value, IScriptSystem *pScriptSystem); // implemented at the end of header
 	// Clear any variable to uninitialized state.
 	void Clear(); // implemented at the end of header
 
@@ -1463,6 +1465,20 @@ inline ScriptAnyValue::ScriptAnyValue(const SmartScriptTable & value, int)
 		table->AddRef();
 }
 
+// ----------------------
+//Server
+/*
+inline bool ScriptAnyValue::CopyTo(SmartScriptFunction& value, IScriptSystem* pScriptSystem)
+{
+	if (this->type != ANY_TFUNCTION)
+	{
+		return false;
+	}
+	value = SmartScriptFunction(pScriptSystem, this->function);
+
+	return true;
+}
+*/
 inline bool ScriptAnyValue::CopyTo(IScriptTable *value)
 {
 	if (type == ANY_TTABLE)

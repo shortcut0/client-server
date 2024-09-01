@@ -52,6 +52,9 @@ History:
 #include "ZoomModes/IronSight.h"
 #include "ZoomModes/Scope.h"
 
+//Server
+#include "CryMP/Server/Server.h"
+
 template <typename T, typename R> R *CreateIt() { return new T(); };
 
 
@@ -312,7 +315,10 @@ CProjectile *CWeaponSystem::SpawnAmmo(IEntityClass* pAmmoType, bool isRemote, En
 
 	SEntitySpawnParams spawnParams;
 	spawnParams.pClass = pAmmoType;
-	spawnParams.sName = "ammo";
+
+	std::string ammoName = "ammo_" + std::string(pAmmoType->GetName()) +"_" + std::to_string(gServer->GetCounter());
+
+	spawnParams.sName = ammoName.c_str();
 	spawnParams.nFlags = pAmmoParams->flags | ENTITY_FLAG_NO_PROXIMITY; // No proximity for this entity.
 	
 	IEntity *pEntity = gEnv->pEntitySystem->SpawnEntity(spawnParams);

@@ -2941,14 +2941,20 @@ void CGameRules::SendChatMessage(EChatMessageType type, EntityId sourceId, Entit
 		if (gServer->GetEvents()->Get("ServerRPC.Callbacks.OnChatMessage", mods, int(type), ScriptHandle(sourceId), ScriptHandle(targetId), msg, m_chatScriptBind_forcedTeam, m_chatScriptBind_svChat))
 		{
 
-			if (mods.GetPtr()) {
+			if (mods && mods.GetPtr()) {
 				mods->GetValue("ShowMessage", show);
-				if (mods->GetValue("NewMessage", newMsg))
+				if (mods->GetValue("NewMessage", newMsg)) {
+				//	CryLogAlways("RECEIVED");
 					params.msg = newMsg;
+				}
+				//else
+				//	CryLogAlways("\"NewMessage\" null");
 
-				CryLogAlways("pointer mods received");
+				//CryLogAlways("msg=%s", params.msg);
+//
+				//CryLogAlways("pointer mods received");
 			}
-			CryLogAlways("mods received");
+			//CryLogAlways("mods received");
 		}
 
 		//CryLogAlways("Show = %s", show ? "yes" : "no");

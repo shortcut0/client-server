@@ -64,10 +64,12 @@ void ServerCVars::InitCVars(IConsole* pConsole)
 	pConsole->Register("server_c4_limit", &server_c4_limit, 30, 0,								"Controls how much C4 a player can own");
 	pConsole->Register("server_allow_c4Hits", &server_allow_c4Hits, 1, 0,						"Enable/Disable C4 hit registry");
 	pConsole->Register("server_allow_scan_explosives", &server_allow_scan_explosives, 1, 0,						"Enable/Disable C4 hit registry");
+	pConsole->Register("server_allow_scan_cloaked", &server_allow_scan_cloaked, 0, 0,						"Enable/Disable C4 hit registry");
 	pConsole->Register("server_c4_stickToPlayers", &server_c4_stickToPlayers, 1, 0,				"Enable/Disable c4 sticking to players");
 	pConsole->Register("server_c4_stickToAllSpecies", &server_c4_stickToAllSpecies, 1, 0,		"Enable/Disable c4 sticking to all actor species (grunts,aliens,etc)");
 	pConsole->Register("server_c4_stickLimitOne", &server_c4_stickLimitOne, 0, 0,				"Enable/Disable limits the amont of c4 that can stick on an actor to 1");
 	pConsole->Register("server_fix_spectatorDesync", &server_fix_spectatorDesync,1, 0, "Enable/Disable attempts to fix the spectator position desync");
+	pConsole->Register("server_spectatorFix_ResetThreshold", &server_spectatorFix_ResetThreshold,1, 0, "Enable/Disable attempts to fix the spectator position desync");
 	
 	// Anti Cheat
 	pConsole->Register("server_anticheat_weaponCheckInterval", &server_anticheat_weaponCheckInterval, (float)(75/100), 0, "Enable/Disable attempts to fix the spectator position desync");

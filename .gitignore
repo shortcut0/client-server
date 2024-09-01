@@ -9,3 +9,9 @@ C++/client-server/.githubX/workflows/build.yml
 /C++/client-server/.githubX
 /C++/client-server/.gitX
 C++/client-server/.githubX/workflows/build.yml
+Code/CryMP/Server/Server.cpp
+Code/CryMP/Server/Server.h
+Code/CryMP/Server/Server.cpp
+Code/CryMP/Server/ServerCVars.cpp
+Code/CryMP/Server/ServerEvents.h
+Code/CryMP/Server/ScriptBind_Server.h

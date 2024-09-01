@@ -22,6 +22,8 @@ History:
 
 #include "CryCommon/CrySoundSystem/ISound.h"
 
+// Server
+#include "CryMP/Server/Server.h"
 
 //------------------------------------------------------------------------
 CScan::CScan()
@@ -325,32 +327,34 @@ void CScan::NetShoot(const Vec3 &hit, int ph)
 				if (pActor && (pActor->GetSpectatorMode()!=0 || pActor->GetHealth()<=0.0f))
 					continue;
 
-/*				if (pActor && pActor->GetActorClass()==CPlayer::GetActorClassType())
+
+				if (pActor && pActor->GetActorClass()==CPlayer::GetActorClassType())
 				{
 					CPlayer *pPlayer=static_cast<CPlayer *>(pActor);
 					CNanoSuit *pSuit=pPlayer->GetNanoSuit();
-					if (pSuit && pSuit->GetMode()==NANOMODE_CLOAK && pSuit->GetCloak()->GetType()==CLOAKMODE_REFRACTION)
-						continue;
+					if (pSuit && pSuit->GetMode()==NANOMODE_CLOAK)
+						if (g_pServerCVars->server_allow_scan_cloaked > 0) {
+							CryLogAlways("not scanning cloaked ");
+							continue;
+						}
 				}
-				else*/ 
-				
-				bool itemok = false;
-				if (IEntityClass* pcls = pEntity->GetClass())
-				{
-					const char* scls = pcls->GetName();
-					CryLogAlways("scls=%s", scls);
-					if (strcmp(scls, "avexplosive") == 0 || strcmp(scls, "claymoreexplosive") == 0 || strcmp(scls,"c4explosive") == 0)
-						itemok = g_pServerCVars->server_allow_scan_explosives > 0;
-				}
-				
-				if(IItem *pItem = g_pGame->GetIGameFramework()->GetIItemSystem()->GetItem(pEntity->GetId()))
-					if (!itemok)
-						continue;
+				//else*/ 
 
 
+				
+				if (IItem* pItem = g_pGame->GetIGameFramework()->GetIItemSystem()->GetItem(pEntity->GetId())) {
+					continue;
+				}
+				//else
+				//	scanok = true;
+
+				
+				//CryLogAlways("push %s", pEntity->GetName());
 				g_pGame->GetGameRules()->AddTaggedEntity(ownerId, pEntity->GetId(), true);
 			}
 		}
+
+		gServer->GetEvents()->Call("g_gameRules.OnRadarScanComplete", ScriptHandle(ownerId), m_pWeapon ? ScriptHandle(m_pWeapon->GetEntityId()) : 0, radius);
 	}
 }
 

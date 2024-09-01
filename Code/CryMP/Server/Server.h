@@ -130,6 +130,9 @@ public:
 	// ------------------------------
 	EntityId m_lastSpawnId = 0;
 
+	int m_counter = 0;
+	int GetCounter() { m_counter++; return m_counter; };
+
 	// ------------------------------
 	void InitCVars(IConsole* pConsole);
 	void InitCommands(IConsole* pConsole);
@@ -213,8 +216,9 @@ public:
 		if (m_pSS)
 			m_pSS->GetGlobalValue("SCRIPT_ERROR", error);
 
-		if (!m_bLuaLoaded)
+		if (!m_bLuaLoaded) {
 			return false;
+		}
 
 		if (!m_ServerRPCCallbackLua)
 			return false;

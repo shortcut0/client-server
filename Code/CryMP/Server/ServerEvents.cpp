@@ -25,12 +25,13 @@ ServerEvents::~ServerEvents()
 	}
 }
 
+
 // --------------------------------------------------------
-std::pair<SmartScriptTable, HSCRIPTFUNCTION> ServerEvents::GetFunc(const std::string& handle)
+std::pair<SmartScriptTable, SmartScriptFunction> ServerEvents::GetFunc(const std::string& handle)
 {
 
+	HSCRIPTFUNCTION pFunc_r = nullptr;
 	SmartScriptTable pHost = nullptr;
-	HSCRIPTFUNCTION pFunc = nullptr;
 
 	// ------------
 	std::string delims(".");
@@ -43,13 +44,13 @@ std::pair<SmartScriptTable, HSCRIPTFUNCTION> ServerEvents::GetFunc(const std::st
 
 		if (c >= tokens.size()) {
 			if (c == 1) {
-				if (!m_pSS->GetGlobalValue(token.c_str(), pFunc)) {
+				if (!m_pSS->GetGlobalValue(token.c_str(), pFunc_r)) {
 					gServer->LogError("ServerEvents::GetFunc Function %s Not found at index %d, Input Host was %s", token.c_str(), c, handle.c_str());
 				}
 			}
 			else
 			{
-				if (!pHost->GetValue(token.c_str(), pFunc)) {
+				if (pHost && !pHost->GetValue(token.c_str(), pFunc_r)) {
 					gServer->LogError("ServerEvents::GetFunc Function %s Not found at index %d, Input Host was %s", token.c_str(), c, handle.c_str());
 				}
 			}
@@ -65,15 +66,20 @@ std::pair<SmartScriptTable, HSCRIPTFUNCTION> ServerEvents::GetFunc(const std::st
 			continue;
 		}
 
-		if (!pHost->GetValue(token.c_str(), pHost)) {
+		if (pHost && !pHost->GetValue(token.c_str(), pHost)) {
 			pHost = nullptr;
-			pFunc = nullptr;
+			//pFunc = nullptr;
 			gServer->LogError("ServerEvents::GetFunc Host Array %s not found at index %d, Input Host was %s", token.c_str(), c, handle.c_str());
 			break;
 		}
 	}
 
-	return std::make_pair(pHost, pFunc);
+	//if (pFunc_r != nullptr)
+	//	pFunc = pFunc_r;
+
+	//SmartScriptFunction smartFunc(m_pSS, pFunc_r);
+	//return std::make_pair(pHost, smartFunc);
+	return std::make_pair(pHost, SmartScriptFunction(m_pSS, pFunc_r));
 }
 
 

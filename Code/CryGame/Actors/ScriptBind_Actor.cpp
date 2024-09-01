@@ -1149,6 +1149,12 @@ int CScriptBind_Actor::TrackViewControlled(IFunctionHandler* pH, int characterSl
 	CActor* pActor = GetActor(pH);
 	if (pActor)
 	{
+
+		SAnimatedCharacterParams p;
+		
+		pActor->GetAnimatedCharacter()->SetParams(p);
+		pActor->GetAnimatedCharacter()->ChangeGraph("", 1);
+
 		ICharacterInstance* pCharacter = pActor->GetEntity()->GetCharacter(characterSlot);
 		if (pCharacter)
 			return pH->EndFunction((pCharacter->GetISkeletonAnim()->GetTrackViewStatus() ? true : false));

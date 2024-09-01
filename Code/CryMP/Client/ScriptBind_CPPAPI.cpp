@@ -226,18 +226,18 @@ int ScriptBind_CPPAPI::Request(IFunctionHandler *pH, SmartScriptTable params, HS
 		const char *method = "GET";
 		const char *body = "";
 		SmartScriptTable headers;
-		int timeout = 4000;
+		//int timeout = 4000;
 
 		chain.GetValue("url", url); // 
 		chain.GetValue("method", method); // POS
 		chain.GetValue("body", body); // a=??&b=??
 		chain.GetValue("headers", headers); // Content-Type = application/x-www-form-urlencoded; charset=utf-8
-		chain.GetValue("timeout", timeout); // 30000
+		//chain.GetValue("timeout", timeout); // 30000
 
 		request.url = url;
 		request.method = method;
 		request.data = body;
-		request.timeout = timeout;
+		//request.timeout = timeout;
 
 		if (headers)
 		{

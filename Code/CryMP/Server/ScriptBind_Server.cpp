@@ -91,6 +91,7 @@ ScriptBind_Server::ScriptBind_Server()
 	SCRIPT_REG_FUNC(GetEntityClasses);   // Returns true if specified entity class is valid (exists)
 	SCRIPT_REG_FUNC(GetItemClasses);   // Returns true if specified entity class is valid (exists)
 	SCRIPT_REG_FUNC(GetVehicleClasses);   // Returns true if specified entity class is valid (exists)
+	SCRIPT_REG_TEMPLFUNC(ExplodeProjectile, "id");   // Returns true if specified entity class is valid (exists)
 	SCRIPT_REG_TEMPLFUNC(GetProjectileOwnerId, "id");   // Returns true if specified entity class is valid (exists)
 	SCRIPT_REG_TEMPLFUNC(GetProjectilePos, "id");   // Returns true if specified entity class is valid (exists)
 	SCRIPT_REG_TEMPLFUNC(SetProjectilePos, "id, pos");   // Returns true if specified entity class is valid (exists)
@@ -216,6 +217,24 @@ int ScriptBind_Server::RayWorldIntersection(IFunctionHandler* pH)
 
 // --------------------------------------------------------------------------------
 // Describe this
+int ScriptBind_Server::ExplodeProjectile(IFunctionHandler* pH, ScriptHandle id)
+{
+	
+	EntityId projectileId(id.n);
+	if (!projectileId)
+		return pH->EndFunction(false);
+
+	if (CProjectile* pProjectile = g_pGame->GetWeaponSystem()->GetProjectile(projectileId)) {
+		pProjectile->Explode(true, true);
+		//fixme
+	}
+
+	return pH->EndFunction(false);
+}
+
+
+// --------------------------------------------------------------------------------
+// Describe this
 int ScriptBind_Server::SetProjectilePos(IFunctionHandler* pH, ScriptHandle id, Vec3 pos)
 {
 	
@@ -224,6 +243,8 @@ int ScriptBind_Server::SetProjectilePos(IFunctionHandler* pH, ScriptHandle id, V
 		return pH->EndFunction(false);
 
 	if (CProjectile* pProjectile = g_pGame->GetWeaponSystem()->GetProjectile(projectileId)) {
+
+		Matrix34 tm;
 		//fixme
 	}
 
@@ -364,7 +385,7 @@ int ScriptBind_Server::GetItemClasses(IFunctionHandler* pH) {
 		}
 	}
 
-	return pH->EndFunction(pClasses);
+	return pH->EndFunction(*pClasses);
 }
 
 
@@ -393,7 +414,7 @@ int ScriptBind_Server::GetVehicleClasses(IFunctionHandler* pH) {
 		}
 	}
 
-	return pH->EndFunction(pClasses);
+	return pH->EndFunction(*pClasses);
 }
 
 // --------------------------------------------------------------------------------
@@ -416,7 +437,7 @@ int ScriptBind_Server::GetEntityClasses(IFunctionHandler* pH) {
 			break;
 	}
 
-	return pH->EndFunction(pClasses);
+	return pH->EndFunction(*pClasses);
 }
 
 // --------------------------------------------------------------------------------
@@ -463,7 +484,7 @@ int ScriptBind_Server::GetLevels(IFunctionHandler* pH) {
 		lvlTable->PushBack(lvTable);
 		// ...
 	}
-	return pH->EndFunction(lvlTable);
+	return pH->EndFunction(*lvlTable);
 }
 
 // -------------------------------------
@@ -590,18 +611,18 @@ int ScriptBind_Server::Request(IFunctionHandler* pH, SmartScriptTable params, HS
 		const char* method = "GET";
 		const char* body = "";
 		SmartScriptTable headers;
-		int timeout = 4000;
+		//int timeout = 4000;
 
 		chain.GetValue("url", url); // 
 		chain.GetValue("method", method); // POS
 		chain.GetValue("body", body); // a=??&b=??
 		chain.GetValue("headers", headers); // Content-Type = application/x-www-form-urlencoded; charset=utf-8
-		chain.GetValue("timeout", timeout); // 30000
+		//chain.GetValue("timeout", timeout); // 30000
 
 		request.url = url;
 		request.method = method;
 		request.data = body;
-		request.timeout = timeout;
+		//request.timeout = timeout;
 
 		if (headers)
 		{

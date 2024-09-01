@@ -704,8 +704,13 @@ bool Server::OnBeforeSpawn(SEntitySpawnParams& params)
 		}*/
 	}
 
-	if (gEnv->pEntitySystem->FindEntityByName(params.sName)) {
-		LogWarning("Spawning entity without unique name! It's %s", params.sName);
+	if (params.sName && params.pClass && gEnv->pEntitySystem->FindEntityByName(params.sName)) {
+
+		if (strcmp(params.sName, params.pClass->GetName()) == 0) {
+			params.sName = params.sName + GetCounter();
+			LogWarning("Fixed bad entity name for entity %s", params.sName);
+		} else
+			LogWarning("Spawning entity without unique name! It's %s", params.sName);
 	}
 
 	return true;
@@ -716,6 +721,13 @@ void Server::OnSpawn(IEntity* pEntity, SEntitySpawnParams& params)
 {
 	FUNCTION_PROFILER(gEnv->pSystem, PROFILE_GAME);
 
+	// =====================================
+	if (IsLuaReady())
+		if (IEntityClass* pClass = params.pClass)
+			if (m_pGameFramework->GetIVehicleSystem()->IsVehicleClass(pClass->GetName()))
+				GetEvents()->Call("ServerRPC.Callbacks.OnVehicleSpawn", ScriptHandle(pEntity->GetId()));
+
+	// =====================================
 	m_lastSpawnId = pEntity->GetId();
 }
 
