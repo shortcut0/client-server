@@ -170,6 +170,7 @@ CScriptBind_Actor::CScriptBind_Actor(ISystem* pSystem)
 	SCRIPT_REG_FUNC(GetLean);
 	SCRIPT_REG_TEMPLFUNC(SetGodMode, "mode");
 	SCRIPT_REG_TEMPLFUNC(SetActorMode, "mode, value");
+	SCRIPT_REG_TEMPLFUNC(GetActorMode, "mode");
 
 	m_pSS->SetGlobalValue("STANCE_PRONE", STANCE_PRONE);
 	m_pSS->SetGlobalValue("STANCE_CROUCH", STANCE_CROUCH);
@@ -193,6 +194,7 @@ CScriptBind_Actor::CScriptBind_Actor(ISystem* pSystem)
 	// SERVER
 	m_pSS->SetGlobalValue("ACTORMODE_UNLIMITEDAMMO", 1);
 	m_pSS->SetGlobalValue("ACTORMODE_UNLIMITEDITEMS", 2);
+	m_pSS->SetGlobalValue("ACTORMODE_RAPIDFIRE", 3);
 
 	m_pSS->SetGlobalValue("LEAN_RIGHT", 1);
 	m_pSS->SetGlobalValue("LEAN_LEFT", -1);
@@ -255,6 +257,39 @@ int CScriptBind_Actor::GetLean(IFunctionHandler* pH)
 
 //------------------------------------------------------------------------
 // SERVER
+int CScriptBind_Actor::GetActorMode(IFunctionHandler* pH, int mode)
+{
+	CActor* pActor = GetActor(pH);
+	if (!pActor)
+		return pH->EndFunction();
+
+	int val = 0;
+
+	switch (mode) {
+		case 1: // unlimitedammo
+		{
+			val = pActor->m_unlimitedAmmo;// = value;
+			break;
+		}
+		case 2:
+		{
+			val = pActor->m_unlimitedWeapons;// = value;
+			break;
+		}
+		case 3: // rapid fire
+		{
+			val = pActor->m_rapidFire;// = value;
+			break;
+		}
+	default:
+		break;
+	}
+
+	return pH->EndFunction(val);
+}
+
+//------------------------------------------------------------------------
+// SERVER
 int CScriptBind_Actor::SetActorMode(IFunctionHandler* pH, int mode, int value)
 {
 	CActor* pActor = GetActor(pH);
@@ -270,6 +305,11 @@ int CScriptBind_Actor::SetActorMode(IFunctionHandler* pH, int mode, int value)
 		case 2:
 		{
 			pActor->m_unlimitedWeapons = value;
+			break;
+		}
+		case 3: // rapid fire
+		{
+			pActor->m_rapidFire = value;
 			break;
 		}
 	default:
@@ -1150,10 +1190,12 @@ int CScriptBind_Actor::TrackViewControlled(IFunctionHandler* pH, int characterSl
 	if (pActor)
 	{
 
+		/*
 		SAnimatedCharacterParams p;
 		
 		pActor->GetAnimatedCharacter()->SetParams(p);
 		pActor->GetAnimatedCharacter()->ChangeGraph("", 1);
+		*/
 
 		ICharacterInstance* pCharacter = pActor->GetEntity()->GetCharacter(characterSlot);
 		if (pCharacter)

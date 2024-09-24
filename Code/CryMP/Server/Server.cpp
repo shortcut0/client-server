@@ -39,6 +39,9 @@
 #include "QuitHook.h"
 #include <cstdlib>  // For std::atexit
 
+// deug..
+#include "CryCommon/CryAction/IGameRulesSystem.h"
+
 // ----------
 ServerCVars* g_pServerCVars = 0;
 
@@ -109,6 +112,8 @@ void Server::Init(IGameFramework* pGameFramework)
 	this->m_pCVars				= std::make_unique<ServerCVars>();
 	this->m_pServerStats		= std::make_unique<ServerStats>();
 	this->m_pAC					= std::make_unique<ServerAnticheat>();
+	this->m_pServerTimer		= std::make_unique<ServerTimer>();
+
 
 	// -----------
 	pGameFramework->RegisterListener(this, "crymp-server", FRAMEWORKLISTENERPRIORITY_DEFAULT);
@@ -128,11 +133,42 @@ void Server::Init(IGameFramework* pGameFramework)
 
 	// -----------
 	// Init Game
-	g_pGame = new CGame();
-	g_pGame->Init(pGameFramework);
+	if (!WinAPI::CmdLine::HasArg("-oldgame"))
+	{
+		m_pGame = new CGame();
+	}
+	else
+	{
+		Log("***************** Using Old Game.DLL! *****************");
+		void* pCryGame = WinAPI::DLL::Load("CryGame.dll");
+		if (!pCryGame)
+		{
+			throw StringTools::SysErrorFormat("Failed to load the CryGame DLL!");
+		}
+
+		auto entry = static_cast<IGame::TEntryFunction>(WinAPI::DLL::GetSymbol(pCryGame, "CreateGame"));
+		if (!entry)
+		{
+			throw StringTools::ErrorFormat("The CryGame DLL is not valid!");
+		}
+
+		m_pGame = entry(pGameFramework);
+	}
+	//g_pGame = new CGame();
+	//g_pGame = m_pGame;
+	//g_pGame = static_cast<CGame*>(g_pGame);
+	//g_pGame = static_cast<CGame*>(g_pGame);
+	m_pGame->Init(pGameFramework);
 
 	// -----------
 	// Init utils and cvars
+
+
+	m_DebugTimer = ServerTimer(0.1f);
+	m_ScriptSecondTimer = ServerTimer(1.f);
+	m_ScriptMinuteTimer = ServerTimer(60.f);
+	m_ScriptHourTimer = ServerTimer(3600.f);
+
 	m_pServerUtils->Init();
 	InitCommands(pConsole);
 	InitCVars(pConsole);
@@ -142,7 +178,7 @@ void Server::Init(IGameFramework* pGameFramework)
 	//m_pServerPublisher->Init(gEnv->pSystem);
 
 	// -----------
-	m_serverScriptPath = m_rootDir.string() + std::string("/Scripts/Main.lua");
+	m_serverScriptPath = m_rootDir.string() + ("/Scripts/Main.lua");
 	m_Initialized = true;
 
 	m_tickGoal = 1.f;
@@ -151,99 +187,213 @@ void Server::Init(IGameFramework* pGameFramework)
 
 	m_lastChannel = 1;
 
-
 	// --------------------------------
 	// OVERWRITE GAME SCRIPT FILES
 
-	std::string overwriteFile = m_rootDir.string() + "/Scripts/GameOverwrites.txt";
+	const std::string overwriteFile = m_rootDir.string() + "/Scripts/GameOverwrites.txt";
 	InitGameOverwrites(overwriteFile);
 
 	// -----------
-	//LOAD lua, NOT INIT
-	InitLua();
+	// Load Script File
+	RegisterScriptGlobals();
+	LoadScript();
+}
 
-	// test!!
-	//m_pOverwriteSF.push_back(std::make_pair("scripts/gamerules/powerstruggle.lua", std::string("../" + m_rootDir.filename().string() + "/Scripts/Game/GameRules/powerstruggle.lua")));
-	// --------------------------------
+// -------------------------------------
+void Server::Debug()
+{
+	IEntityItPtr pIIt = gEnv->pEntitySystem->GetEntityIterator();
+	IEntity* pEntity = 0;
+
+	pIIt->MoveFirst();
+
+	IGameRulesSystem* pGR = gEnv->pGame->GetIGameFramework()->GetIGameRulesSystem();
+	IGameRules* pGRR = pGR->GetCurrentGameRules();
+	//CGameRules* pCGR = static_cast<CGameRules*>(pGRR);
+
+	m_pGame->GetIGameFramework()->GetIGameRulesSystem();
+
+	while (pEntity = pIIt->Next())
+	{
+		if (strcmp("Player", pEntity->GetClass()->GetName()) == 0)
+		{
+			GetEvents()->Call("ServerCommands.DebugEffect", pEntity->GetScriptTable(), "/flare");
+			GetEvents()->Call("g_gameRules.game.ServerExplosion", ScriptHandle(EntityId(0)), ScriptHandle(EntityId(0)),0, pEntity->GetWorldPos(),Vec3(0,0,1),0,0,0,0,"explosions.flare.a",1,0, 0,0,0);
+			
+			/*
+			IScriptTable* gr;
+			IScriptTable* grg;
+			gEnv->pScriptSystem->GetGlobalValue("g_gameRules", gr);
+			if (!gr)
+			{
+				Log("not found yet");
+				return;
+			}
+			gr->GetValue("game", grg);
+			HSCRIPTFUNCTION spawn;
+			grg->GetValue("ServerExplosion", spawn);
+
+			//Script::Call(gEnv->pScriptSystem, spawn, 0, 0, 0, pEntity->GetWorldPos(), Vec3(0, 0, 1), 0, 0, 0, 0, "explosions.flare.a", 1, 0, 0, 0, 0);
+
+			gEnv->pScriptSystem->BeginCall(spawn);
+			gEnv->pScriptSystem->PushFuncParam(grg);
+			gEnv->pScriptSystem->PushFuncParam(0);
+			gEnv->pScriptSystem->PushFuncParam(0);
+			gEnv->pScriptSystem->PushFuncParam(0);
+			gEnv->pScriptSystem->PushFuncParam(pEntity->GetWorldPos());
+			gEnv->pScriptSystem->PushFuncParam(Vec3(0,0,1));
+			gEnv->pScriptSystem->PushFuncParam(0);
+			gEnv->pScriptSystem->PushFuncParam(0);
+			gEnv->pScriptSystem->PushFuncParam(0);
+			gEnv->pScriptSystem->PushFuncParam(0);
+			gEnv->pScriptSystem->PushFuncParam("explosions.flare.a");
+			gEnv->pScriptSystem->PushFuncParam(1);
+			gEnv->pScriptSystem->PushFuncParam(0);
+			gEnv->pScriptSystem->PushFuncParam(0);
+			gEnv->pScriptSystem->PushFuncParam(0);
+			gEnv->pScriptSystem->PushFuncParam(0);
+
+			// 0, 0, 0, 0, "explosions.flare.a", 1, 0, 0, 0, 0
+			gEnv->pScriptSystem->EndCall();
+
+			gEnv->pScriptSystem->ReleaseFunc(spawn);
+			
+			// g_pGame:ServerExplosion(NULL_ENTITY, NULL_ENTITY, 0, (vPos), (vDir or vectors.up), 0, 0, 0, 0, sEffect, (iScale or 1), nil, 0, 0, 0)
+			*/
+			HitInfo sh;
+			sh.shooterId = pEntity->GetId();
+			sh.targetId = pEntity->GetId();
+			sh.remote = true;
+			sh.type = 0;
+			sh.weaponId = pEntity->GetId();
+			sh.pos = pEntity->GetWorldPos();
+			sh.dir = Vec3(0, 0, 0);
+			sh.fmId = 1;
+			sh.bulletType = 1;
+			sh.angle = 45;
+			sh.damage = 999;
+			sh.material = 1;
+			sh.normal = Vec3(0, 0, 0);
+			sh.seq = 1;
+			sh.radius = 1;
+			sh.projectileId = 0;
+			pGRR->ClientHit(sh);
+			Log("hit %s", pEntity->GetName());
+		}
+	}
 }
 
 // -------------------------------------
 void Server::UpdateLoop()
 {
 
+	// ========== CFG =============
 	std::string cfg ("CryMP-Server\\Config\\Init.cfg");
 	if (WinAPI::CmdLine::HasArg("-headless"))
+	{
 		cfg = "CryMP-Server\\Config\\Init-Headless.cfg";
+	}
 
 	ReadCfg(cfg);
 
+	// ========== UPDATE =============
 	const bool haveFocus = true;
 	const unsigned int updateFlags = 0;
 
-	while (g_pGame->Update(haveFocus, updateFlags))
+	while (m_pGame->Update(haveFocus, updateFlags))
 	{
 
 		float frametime = gEnv->pTimer->GetFrameTime();
-		bool newChan = false;
+		bool NewChannel = false;
 
-		if (INetChannel* pNextChannel = g_pGame->GetIGameFramework()->GetNetChannel(m_lastChannel)) {
-			newChan = true;
+		bool ScriptReady = IsLuaReady();
+
+		while (INetChannel* pNextChannel = m_pGame->GetIGameFramework()->GetNetChannel(m_lastChannel)) 
+		{
+			if (ScriptReady)
+			{
+				const std::string ip = GetUtils()->CryChannelToIP(m_lastChannel);
+				GetEvents()->Call("ServerRPC.Callbacks.OnConnection", m_lastChannel, ip.c_str());
+			}
+			m_lastChannel++;
 		}
 
 		if (m_Initialized) {
+
+
+			if (GetCVars()->server_debug_positions > 0 && m_DebugTimer.Expired_Refresh())
+			{
+				Debug();
+			}
 		
-			if (IsLuaReady()) {
+			if (ScriptReady) 
+			{
 
-				m_tickCounter += gEnv->pTimer->GetFrameTime();
+				m_tickCounter += frametime;
 				GetStats()->Update(m_tickCounter);
+				
+				// Every Frame
+				GetEvents()->Call("ServerRPC.Callbacks.OnUpdate");
+				
+				// Every Second
+				//Log("Diff= %f, since creation: %f", m_ScriptSecondTimer.Diff(), m_ScriptSecondTimer.Diff_C());
+				if (m_ScriptSecondTimer.Expired_Refresh())
+				{
+					GetEvents()->Call("ServerRPC.Callbacks.OnTimer", 1);
+				}
 
-				//if (GetStats()->Update(m_tickCounter))
-				//	CryLogAlways("%02.2f - %f, %f - %s", GetStats()->GetCPUUsage(), GetStats()->GetMemUsage(), GetStats()->GetMemPeak(), GetStats()->GetCPUName().c_str());
+				// Every Minute
+				if (m_ScriptMinuteTimer.Expired_Refresh())
+				{
+					GetEvents()->Call("ServerRPC.Callbacks.OnTimer", 2);
+				}
 
-				if (m_ServerRPCCallbackLua && m_ServerRPCCallbackLua.GetPtr()) {
+				// Every Hour
+				if (m_ScriptHourTimer.Expired_Refresh())
+				{
+					GetEvents()->Call("ServerRPC.Callbacks.OnTimer", 3);
+				}
+
+				/*if (m_ServerRPCCallbackLua && m_ServerRPCCallbackLua.GetPtr()) {
 
 					Script::CallMethod(m_ServerRPCCallbackLua, "OnUpdate");
 
-					if (m_tickCounter >= m_tickGoal) {
+					if (m_tickCounter >= m_tickGoal) 
+					{
 						Script::CallMethod(m_ServerRPCCallbackLua, "OnTimer", 1);
 						m_tickGoal += (1.0f);
 					}
 
-					if (m_tickCounter >= m_minGoal) {
+					if (m_tickCounter >= m_minGoal) 
+					{
 						Script::CallMethod(m_ServerRPCCallbackLua, "OnTimer", 2);
 						m_minGoal += (60.0f);
 					}
 
-					if (m_tickCounter >= m_hourGoal) {
+					if (m_tickCounter >= m_hourGoal) 
+					{
 						Script::CallMethod(m_ServerRPCCallbackLua, "OnTimer", 3);
 						m_hourGoal += (3600.f);
 					}
-				}
-
-
-				if (newChan) {
-					std::string ip = GetUtils()->CryChannelToIP(m_lastChannel);
-					GetEvents()->Call("ServerRPC.Callbacks.OnConnection", m_lastChannel, ip.c_str());
-				}
+				}*/
 				
 			}
 		}
-		// Update always in case of script errors to prevent the channel queue from getting stuck!
-		if (newChan)
-			m_lastChannel++;
-
-		m_bErrorHandledFrame = false;
 
 		if (m_pSS)
+		{
 			m_pSS->SetGlobalValue("DLL_ERROR", false);
+		}
 
 		// exists already :s
 		//UpdateEntityRemoval();
 	}
 
 
+	// FIXME: i don't think this is called
 	// Save Data !!
-	if (IsLuaReady()) {
+	if (IsLuaReady()) 
+	{
 		GetEvents()->Call("ServerRPC.Callbacks.OnGameShutdown");
 	}
 
@@ -276,7 +426,6 @@ void Server::UpdateEntityRemoval()
 // -------------------------------------
 void Server::InitCommands(IConsole *pConsole)
 {
-
 	pConsole->AddCommand("server_reloadScript", OnInitLuaCmd, VF_NOT_NET_SYNCED, "Reload the main Server Initializer Script");
 }
 
@@ -284,7 +433,6 @@ void Server::InitCommands(IConsole *pConsole)
 // -------------------------------------
 void Server::InitCVars(IConsole *pConsole)
 {
-
 	if (m_pCVars) {
 		m_pCVars->InitCVars(pConsole);
 		g_pServerCVars = GetCVars();
@@ -318,8 +466,9 @@ bool Server::ReadCfg(const std::string &filepath)
 // -------------------------------------
 void Server::InitMasters()
 {
-	std::string content;
+	 // FIXME: Use server dir!
 
+	std::string content;
 	WinAPI::File file("masters.txt", WinAPI::FileAccess::READ_ONLY);  // Crysis main directory
 	if (file)
 	{
@@ -390,13 +539,11 @@ void Server::HttpRequest(HTTPClientRequest&& request)
 
 // -------------------------------------
 void Server::OnInitLuaCmd(IConsoleCmdArgs* pArgs) {
-	gServer->InitLua();
+	gServer->LoadScript(true);
 }
 
 // -------------------------------------
-void Server::InitLua() {
-
-	m_bLuaLoaded = false;
+void Server::RegisterScriptGlobals() {
 
 	// -----
 	m_pSS->SetGlobalValue("CRYMP_SERVER_EXE", CRYMP_SERVER_EXE_NAME);
@@ -406,67 +553,49 @@ void Server::InitLua() {
 	m_pSS->SetGlobalValue("CRYMP_SERVER_BUILD_TYPE", CRYMP_SERVER_BUILD_TYPE);
 	m_pSS->SetGlobalValue("CRYMP_SERVER_COMPILER", CRYMP_SERVER_COMPILER);
 
-	// -----
-	if (m_serverScriptPath.empty()) {
-		LogError("Server Script path empty!");
-		return;
-	}
-
-	// -----
-
-	// -----
-	// horrble..horrable..horrable..horrable IF X FIX IF X IFI FIIIFIXIFIX OmggggAHo
-	if (!m_bLevelLoaded) {
-		Log("Loading Server Script %s...", m_serverScriptPath.c_str());
-		if (!m_pSS->ExecuteFile(m_serverScriptPath.c_str(), true, true)) {
-			LogError("Failed to load the Server Script %s", m_serverScriptPath.c_str());
-			return;
-		}
-	}
-
-	if (m_bLevelLoaded)
-		InitServerLua();
-
-	Log("Server Main Script Loaded");
-	m_bLuaLoaded = true;
-	return;
 }
 
 // -------------------------------------
-void Server::InitServerLua()
-{
+void Server::LoadScript(bool ForceInit) {
 
-	// Reset this flag every time! in case the user breaks our scripts to avoid a fatal crash!
-	m_ATOMLuaInitialized = false;
+	const char* ScriptFile = m_serverScriptPath.c_str();
 
-	// -----
-	// fix this.. its load it AGAIN..
-	Log("Loading Server Script %s...", m_serverScriptPath.c_str());
-	if (!m_pSS->ExecuteFile(m_serverScriptPath.c_str(), true, true)) {
-		LogError("Failed to load the Server Script %s", m_serverScriptPath.c_str());
-		return;
+	Log("Loading Server Script: %s", ScriptFile);
+	m_ScriptLoaded = m_pSS->ExecuteFile(ScriptFile, true, true);
+	
+	if (!m_ScriptLoaded) 
+	{
+		return LogError("Failed to load the Server Script: %s", ScriptFile);
 	}
 
-	if (!m_pSS->GetGlobalValue("Server", m_ATOMLua)) {
-		LogError("Server Global not found (Server Script: %s)", m_serverScriptPath.c_str());
-		return;
+	if (ForceInit)
+	{
+		InitScript();
 	}
 
-	// -----
-	if (!m_pSS->GetGlobalValue("ServerRPC", m_ServerRPCLua)) {
-		LogError("ServerRPC Global not found (Server Script: %s)", m_serverScriptPath.c_str());
-		return;
+	Log("Server Script Loaded");
+}
+
+// -------------------------------------
+void Server::InitScript() {
+
+	Log("Initializing Server Script..");
+
+	if (!m_ScriptLoaded)
+	{
+		return LogWarning("Script not loaded: Cannot Initialize!");
 	}
 
-	// -----
-	if (!m_ServerRPCLua->GetValue("Callbacks", m_ServerRPCCallbackLua)) {
-		LogError("ServerRPC.Callbacks not found (Server Script: %s)", m_serverScriptPath.c_str());
-		return;
+	bool Success(false);
+	m_ScriptInitialized = (GetEvents()->Get("ServerInit.InitServer", Success) && Success);
+
+	if (!m_ScriptInitialized)
+	{
+		return LogWarning("Failed to Initialize the Script!");
 	}
 
-	m_ATOMLuaInitialized = true;
-	Log("Server Initialized!");
-
+	Log("Server Script Initialized");
+	return;
 }
 
 // -------------------------------------
@@ -479,7 +608,8 @@ void Server::OnPostUpdate(float deltaTime)
 // -------------------------------------
 void Server::OnGameStart(IGameObject* pGameRules)
 {
-
+	// FIXME: Experimental!
+	//gServer->LoadScript(true);
 }
 
 // -------------------------------------
@@ -504,24 +634,27 @@ void Server::OnActionEvent(const SActionEvent& event)
 
 	switch (event.m_event)
 	{
-		case eAE_channelCreated:
-		case eAE_channelDestroyed:
-		case eAE_connectFailed:
-		case eAE_connected:
-		case eAE_disconnected:
-		case eAE_clientDisconnected:
-		case eAE_resetBegin:
-		case eAE_resetEnd:
-		case eAE_resetProgress:
-		case eAE_preSaveGame:
-		case eAE_postSaveGame:
-		case eAE_inGame:
-		case eAE_serverName:
-		case eAE_serverIp:
-		case eAE_earlyPreUpdate:
-		{
-			break;
-		}
+	case eAE_channelCreated:
+		Log("Channel created? event.m_val=%d", event.m_value);
+		break;
+
+	case eAE_channelDestroyed:
+	case eAE_connectFailed:
+	case eAE_connected:
+	case eAE_disconnected:
+	case eAE_clientDisconnected:
+	case eAE_resetBegin:
+	case eAE_resetEnd:
+	case eAE_resetProgress:
+	case eAE_preSaveGame:
+	case eAE_postSaveGame:
+	case eAE_inGame:
+	case eAE_serverName:
+	case eAE_serverIp:
+	case eAE_earlyPreUpdate:
+	{
+		break;
+	}
 	}
 }
 
@@ -540,14 +673,10 @@ void Server::OnLoadingStart(ILevelInfo* pLevel)
 void Server::OnLoadingComplete(ILevel* pLevel)
 {
 
-	m_bLevelLoaded = true;
-	//InitLua();
-	if (!m_bLuaLoaded)
-		InitLua(); // reload all
-	else
-		InitServerLua(); // init server
+	LoadScript(true);
 
-	if (m_pSS) {
+	if (m_pSS) 
+	{
 		m_pSS->SetGlobalValue("MAP_START_TIME", gEnv->pTimer->GetCurrTime());
 		if (IsLuaReady()) {
 			GetEvents()->Call("ServerRPC.Callbacks.OnMapStarted");
@@ -602,132 +731,85 @@ bool Server::OnBeforeSpawn(SEntitySpawnParams& params)
 	}
 	else if (IsLuaReady()) {
 
-		// not needed rn
-		/*
-		bool filterok = false;
-		if (IEntityClass* pClass = params.pClass)
-		{
 
-			if (IGameFramework* pF = gEnv->pGame->GetIGameFramework()) {
-
-				if (pF->GetIVehicleSystem()->IsVehicleClass(pClass->GetName()))
-					filterok = true;
-
-				const char* sClass = pClass->GetName();
-				if (!filterok && (
-					//strcmp(sClass, "Player") == 0 ||
-					//strcmp(sClass, "Grunt") == 0 ||
-					strcmp(sClass, "end") == 0
-					//add more here!
-					)) filterok = true;
-			}
-
-		}
-
-		if (!filterok)
-			return true;
-
-		SmartScriptTable chain(m_pSS);
-		SmartScriptTable spawnparams = m_pSS->CreateTable();
-
-		// sends table 1 in and retrives new properties from table 2
-
-		spawnparams->SetValue("id", params.id ? ScriptHandle(params.id) : 0);
-		spawnparams->SetValue("position", params.vPosition ? params.vPosition : Vec3(0, 0, 0));
-		spawnparams->SetValue("direction", Vec3(params.qRotation.GetFwdX(), params.qRotation.GetFwdY(), params.qRotation.GetFwdZ()));
-		spawnparams->SetValue("class", params.pClass ? params.pClass->GetName() : "");
-		spawnparams->SetValue("scale", params.vScale ? params.vScale : Vec3(0, 0, 0));
-		spawnparams->SetValue("flags", params.nFlags ? params.nFlags : 0);
-
-		//if (params.pPropertiesInstanceTable) {
-			spawnparams->SetValue("propertiesInstance", params.pPropertiesInstanceTable);
-			spawnparams->SetValue("properties", params.pPropertiesTable);
-		//}
-
-		//if (params.pPropertiesTable) {
-			
-		//}
-
-		if (!GetEvents()->Get("ServerRPC.Callbacks.OnBeforeSpawn", chain, spawnparams))
-			return true;
-
-
-		bool cancel = false;
-		if (chain->GetValue("abort", cancel) && cancel == true)
-			return false;
-
-		const char* entityClass = nullptr;
-		const char* entityName = "";
-		const char* archetypeName = nullptr;
-		ScriptHandle entityId;
-		IScriptTable *propsTable = m_pSS->CreateTable();
-		IScriptTable* propsInstanceTable = m_pSS->CreateTable();
-
-		Vec3 pos(0.0f, 0.0f, 0.0f);
-		Vec3 dir(1.0f, 0.0f, 0.0f);
-		Vec3 scale(1.0f, 1.0f, 1.0f);
-		int flags = 0;
-
-		bool props = false;
-		bool propsInstance = false;
-
-		if (chain->GetValue("id", entityId))
-			params.id = (EntityId)entityId.n;
-
-		if (chain->GetValue("class", entityClass))
-			params.pClass = gEnv->pEntitySystem->GetClassRegistry()->FindClass(entityClass);
-
-		if (chain->GetValue("name", entityName))
-			params.sName = entityName;
-
-		if (chain->GetValue("position", pos))
-			params.vPosition = pos;
-
-		if (chain->GetValue("orientation", dir))
-			params.qRotation = Quat(Matrix33::CreateRotationVDir(dir));
-
-		if (chain->GetValue("scale", scale))
-			params.vScale = scale;
-
-		if (chain->GetValue("flags", flags))
-			params.nFlags = flags;
-
-		props = chain->GetValue("properties", propsTable);
-		propsInstance = chain->GetValue("propertiesInstance", propsInstanceTable);
-
-		if (props) {
-			params.pPropertiesTable = propsTable;
-		}
-
-		if (propsInstance) {
-			params.pPropertiesInstanceTable = propsInstanceTable;
-		}*/
 	}
 
-	if (params.sName && params.pClass && gEnv->pEntitySystem->FindEntityByName(params.sName)) {
-
-		if (strcmp(params.sName, params.pClass->GetName()) == 0) {
-			params.sName = params.sName + GetCounter();
-			LogWarning("Fixed bad entity name for entity %s", params.sName);
-		} else
-			LogWarning("Spawning entity without unique name! It's %s", params.sName);
+	// Fixed entity names for respawning entities
+	const char* respawn_name;
+	IScriptTable* pProperties = params.pPropertiesTable;
+	if (pProperties)
+	{
+		Log("found props..");
+		if (pProperties->GetValue("sRespawnName", respawn_name)) 
+		{
+			params.sName = respawn_name;
+			Log("Fixed name for Entity %s", respawn_name);
+		}
 	}
 
 	return true;
 }
+
 
 // -------------------------------------
 void Server::OnSpawn(IEntity* pEntity, SEntitySpawnParams& params)
 {
 	FUNCTION_PROFILER(gEnv->pSystem, PROFILE_GAME);
 
-	// =====================================
-	if (IsLuaReady())
-		if (IEntityClass* pClass = params.pClass)
-			if (m_pGameFramework->GetIVehicleSystem()->IsVehicleClass(pClass->GetName()))
-				GetEvents()->Call("ServerRPC.Callbacks.OnVehicleSpawn", ScriptHandle(pEntity->GetId()));
+	// For -oldgame
+	if (!g_pGame)
+	{
+		return;
+	}
+
+	//Log("name=%s", params.sName);
+	//Log("class=%s", params.pClass->GetName());
+	/*if (strcmp(params.sName, "GameRules") == 0 && (strcmp(params.pClass->GetName(), "PowerStruggle") + strcmp(params.pClass->GetName(), "InstantAction")) > 0)
+	{
+		gServer->LoadScript(true);
+	}*/
 
 	// =====================================
+	if (IsLuaReady())
+	{
+
+		bool vehicle = false;
+		bool item = false;
+		bool ignore = false;
+		if (IEntityClass* pClass = params.pClass)
+		{
+
+			// Vehicle
+			if (m_pGameFramework->GetIVehicleSystem()->IsVehicleClass(pClass->GetName()))
+			{
+				vehicle = true;
+				//GetEvents()->Call("ServerRPC.Callbacks.OnVehicleSpawn", ScriptHandle(pEntity->GetId()));
+			}
+
+			// Items
+			if (m_pGameFramework->GetIItemSystem()->IsItemClass(pClass->GetName())) 
+			{
+				item = true;
+			}
+
+			// Projectiles
+			if (g_pGame->GetWeaponSystem()->GetProjectile(pEntity->GetId()) != 0)
+			{
+				ignore = true;
+			}
+		}
+
+		if (!ignore)
+		{
+			if (IScriptTable* pScriptTable = pEntity->GetScriptTable())
+			{
+				GetEvents()->Call("ServerRPC.Callbacks.OnEntitySpawn", pScriptTable, ScriptHandle(pEntity->GetId()), vehicle, item);
+			}
+		}
+	}
+
+	// =====================================
+	m_spawnCounter++;
 	m_lastSpawnId = pEntity->GetId();
 }
 
@@ -745,10 +827,8 @@ void Server::OnEvent(IEntity* pEntity, SEntityEvent& event)
 // -------------------------------------
 void Server::HandleScriptError(const std::string &error)
 {
-	if (IsLuaReady()) {
-		if (m_bErrorHandledFrame)
-			return;
-
+	if (IsLuaReady()) 
+	{
 		m_pSS->SetGlobalValue("DLL_ERROR", true);
 		GetEvents()->Call("HandleError", error.c_str());
 	}
@@ -766,7 +846,8 @@ bool Server::UpdateGameSpyServerReport(EGameSpyUpdateType type, const char* key,
 	if (!pGSReport)
 		return false;
 
-	switch (type) {
+	switch (type) 
+	{
 	case EGameSpyUpdateType::eGSUpdate_Server:
 		pGSReport->SetServerValue(key, value);
 		break;
@@ -780,6 +861,7 @@ bool Server::UpdateGameSpyServerReport(EGameSpyUpdateType type, const char* key,
 		break;
 
 	default:
+		Log("Unknown type specified to UpdateGameSpyServerReport(): %d", type);
 		break;
 	}
 
@@ -823,6 +905,19 @@ void Server::InitGameOverwrites(const std::string& filename) {
 
 	file.close();
 }
+
+// -------------------------------------
+void Server::OnScriptLoaded(const std::string& fileName)
+{
+
+	if (!IsLuaReady())
+	{
+		return;
+	}
+
+	GetEvents()->Call("ServerRPC.Callbacks.OnScriptLoaded", fileName.c_str());
+}
+
 
 // -------------------------------------
 bool Server::OverwriteScriptPath( std::string &output, const std::string& input) {

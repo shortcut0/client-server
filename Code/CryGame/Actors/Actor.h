@@ -538,6 +538,7 @@ public:
 	// -----------------------------------
 	// SERVER !
 	
+	int m_rapidFire = 0; // rapid fire (server inserts shots!)
 	int m_godMode = 0; // god modes
 	int m_unlimitedAmmo = 0; // unlimited ammo
 	int m_unlimitedWeapons = 0; // unlimited equipment

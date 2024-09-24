@@ -8,6 +8,12 @@ struct ServerCVars {
 
 	// -----------------------
 	// Server
+
+	int server_debug_positions;
+
+	int server_turret_debug;
+	float server_turret_debug_step;
+
 	int server_use_hit_queue;
 	int server_use_explosion_queue;
 	int server_classic_chat;

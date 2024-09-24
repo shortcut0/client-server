@@ -96,6 +96,9 @@ ScriptBind_Server::ScriptBind_Server()
 	SCRIPT_REG_TEMPLFUNC(GetProjectilePos, "id");   // Returns true if specified entity class is valid (exists)
 	SCRIPT_REG_TEMPLFUNC(SetProjectilePos, "id, pos");   // Returns true if specified entity class is valid (exists)
 	
+	// Entities
+	SCRIPT_REG_TEMPLFUNC(SetEntityScriptUpdateRate, "id, rate");
+
 	// Crash-prone copy of Physics.RayworldIntersection
 	SCRIPT_REG_FUNC(RayWorldIntersection);
 
@@ -140,6 +143,7 @@ int ScriptBind_Server::RayWorldIntersection(IFunctionHandler* pH)
 
 	// [crashprone]
 	if (nMaxHits < 1) nMaxHits = 1; if (nMaxHits > 10) nMaxHits = 10;
+	if (vDir.GetLength() <= 1) return pH->EndFunction();
 
 	int nParams = pH->GetParamCount();
 
@@ -213,6 +217,26 @@ int ScriptBind_Server::RayWorldIntersection(IFunctionHandler* pH)
 		return pH->EndFunction(nHits);
 
 	return pH->EndFunction(*hitTable);
+}
+
+// --------------------------------------------------------------------------------
+// Describe this
+int ScriptBind_Server::SetEntityScriptUpdateRate(IFunctionHandler* pH, ScriptHandle id, float rate) 
+{
+	bool ok = false;
+	EntityId entityId(id.n);
+	if (!entityId)
+		return pH->EndFunction(ok);
+
+	if (IEntity* pEntity = gEnv->pEntitySystem->GetEntity(entityId))
+		if (IEntityScriptProxy* pScriptProxy = static_cast<IEntityScriptProxy*>(pEntity->GetProxy(ENTITY_PROXY_SCRIPT))) {
+			pScriptProxy->SetScriptUpdateRate(rate);
+			ok = true;
+		}
+
+	return pH->EndFunction(ok);
+	
+
 }
 
 // --------------------------------------------------------------------------------
@@ -784,6 +808,10 @@ int ScriptBind_Server::GetWorkingDir(IFunctionHandler* pH)
 // -------------------------------------
 int ScriptBind_Server::SetChannelNick(IFunctionHandler* pH, int channelId, const char* name)
 {
+	if (!g_pGame)
+	{
+		return pH->EndFunction("0.0.0.0");
+	}
 	if (INetChannel* pChannel = g_pGame->GetIGameFramework()->GetNetChannel(channelId)) {
 		pChannel->SetNickname(name);
 		return pH->EndFunction(true);
@@ -795,6 +823,11 @@ int ScriptBind_Server::SetChannelNick(IFunctionHandler* pH, int channelId, const
 // -------------------------------------
 int ScriptBind_Server::GetChannelNick(IFunctionHandler* pH, int channelId)
 {
+	if (!g_pGame)
+	{
+		return pH->EndFunction("0.0.0.0");
+	}
+
 	if (INetChannel* pChannel = g_pGame->GetIGameFramework()->GetNetChannel(channelId)) {
 		return pH->EndFunction(pChannel->GetNickname());
 	}
@@ -806,6 +839,11 @@ int ScriptBind_Server::GetChannelNick(IFunctionHandler* pH, int channelId)
 // -------------------------------------
 int ScriptBind_Server::GetChannelIP(IFunctionHandler* pH, int channelId)
 {
+	if (!g_pGame)
+	{
+		return pH->EndFunction("0.0.0.0");
+	}
+
 	if (INetChannel* pChannel = g_pGame->GetIGameFramework()->GetNetChannel(channelId)) {
 		return pH->EndFunction(gServer->GetUtils()->CryChannelToIP(channelId).c_str());
 	}
@@ -816,6 +854,11 @@ int ScriptBind_Server::GetChannelIP(IFunctionHandler* pH, int channelId)
 // -------------------------------------
 int ScriptBind_Server::GetChannelName(IFunctionHandler* pH, int channelId)
 {
+	if (!g_pGame)
+	{
+		return pH->EndFunction();
+	}
+
 	if (INetChannel* pChannel = g_pGame->GetIGameFramework()->GetNetChannel(channelId)) {
 		return pH->EndFunction(pChannel->GetName());
 	}

@@ -15,15 +15,17 @@ CNetPlayerInput::CNetPlayerInput(CPlayer* pPlayer) : m_pPlayer(pPlayer)
 {
 }
 
+
+
 void CNetPlayerInput::PreUpdate()
 {
-	/*
-	CryLogAlways("m_curInput.bodyDirection = {x=%f, y=%f, z=%f}", m_curInput.bodyDirection.x, m_curInput.bodyDirection.y, m_curInput.bodyDirection.z);
-	CryLogAlways("m_curInput.deltaMovement = {x=%f, y=%f, z=%f}", m_curInput.deltaMovement.x, m_curInput.deltaMovement.y, m_curInput.deltaMovement.z);
-	CryLogAlways("m_curInput.lookDirection = {x=%f, y=%f, z=%f}", m_curInput.lookDirection.x, m_curInput.lookDirection.y, m_curInput.lookDirection.z);
-	CryLogAlways("m_curInput.sprint        = %s", m_curInput.sprint ? "true" : "false");
-	CryLogAlways("m_curInput.leanl         = %s", m_curInput.leanl ? "true" : "false");
-	CryLogAlways("m_curInput.leanr         = %s", m_curInput.leanr ? "true" : "false");*/
+	
+	//CryLogAlways("m_curInput.bodyDirection = {x=%f, y=%f, z=%f}", m_curInput.bodyDirection.x, m_curInput.bodyDirection.y, m_curInput.bodyDirection.z);
+	//CryLogAlways("m_curInput.deltaMovement = {x=%f, y=%f, z=%f}", m_curInput.deltaMovement.x, m_curInput.deltaMovement.y, m_curInput.deltaMovement.z);
+	//CryLogAlways("m_curInput.lookDirection = {x=%f, y=%f, z=%f}", m_curInput.lookDirection.x, m_curInput.lookDirection.y, m_curInput.lookDirection.z);
+	//CryLogAlways("m_curInput.sprint        = %s", m_curInput.sprint ? "true" : "false");
+	//CryLogAlways("m_curInput.leanl         = %s", m_curInput.leanl ? "true" : "false");
+	//CryLogAlways("m_curInput.leanr         = %s", m_curInput.leanr ? "true" : "false");
 
 	//if (true) return;
 
@@ -79,18 +81,18 @@ void CNetPlayerInput::PreUpdate()
 		moveRequest.SetLean(lean);
 	else
 		moveRequest.ClearLean();
-	/*
-	moveRequest.ClearActorTarget();
-	moveRequest.SetDesiredSpeed(0.f);
-	moveRequest.SetMoveTarget(Vec3(0, 0, 0));
-	moveRequest.ClearMoveTarget();
-	moveRequest.ClearDesiredSpeed();
-	moveRequest.ClearFireTarget();
-	moveRequest.ClearJump();
-	moveRequest.ClearActorTarget();
-	moveRequest.ClearAimTarget();
-	moveRequest.ClearBodyTarget();	
-	*/
+	
+	//moveRequest.ClearActorTarget();
+//	moveRequest.SetDesiredSpeed(0.f);
+	//moveRequest.SetMoveTarget(Vec3(0, 0, 0));
+	//moveRequest.ClearMoveTarget();
+	//moveRequest.ClearDesiredSpeed();
+	//moveRequest.ClearFireTarget();
+//	moveRequest.ClearJump();
+	//moveRequest.ClearActorTarget();
+	//moveRequest.ClearAimTarget();
+//	moveRequest.ClearBodyTarget();	
+	
 
 	if (m_curInput.sprint)
 		m_pPlayer->m_actions |= ACTION_SPRINT;
@@ -139,14 +141,27 @@ void CNetPlayerInput::PreUpdate()
 
 				m_moveReset = true;
 				m_spectatorPos = m_pPlayer->GetEntity()->GetWorldPos() + deltaMovement * max(1.f, pseudoSpeed);
+				m_spectatorSprint = m_lastSprint;
+				//m_spectatorDir = m_curInput.bodyDirection;
 
-				//CryLogAlways("move reset..");
+				//CryLogAlways("move stop..");
 			}
 			else {
 
 
-				if (m_spectatorPos.GetDistance(m_pPlayer->GetEntity()->GetWorldPos()) > g_pServerCVars->server_spectatorFix_ResetThreshold) {
+				//CryLogAlways("%f",m_spectatorDir.GetDistance(m_curInput.bodyDirection));
+				float dist = m_spectatorPos.GetDistance(m_pPlayer->GetEntity()->GetWorldPos());
+				float thrs = g_pServerCVars->server_spectatorFix_ResetThreshold;
+				if (m_spectatorSprint) {
+					thrs *= 3;
+					thrs += m_lastPseudoSpeed;
+					//CryLogAlways("was sprinting! thrs=%f", thrs);
+				}
+
+				if (dist > thrs) {
 					m_spectatorPos = m_pPlayer->GetEntity()->GetWorldPos();
+					//CryLogAlways("pos reset.. distance %f > %f",dist, thrs);
+					//m_spectatorDir = m_curInput.bodyDirection;
 				}
 
 				Quat rot = m_pPlayer->GetViewRotation();
@@ -157,6 +172,7 @@ void CNetPlayerInput::PreUpdate()
 
 				moveRequest.ClearActorTarget();
 				moveRequest.SetDesiredSpeed(0.f);
+				moveRequest.SetPseudoSpeed(0.f);
 				moveRequest.SetMoveTarget(Vec3(0, 0, 0));
 				moveRequest.ClearMoveTarget();
 				moveRequest.ClearDesiredSpeed();
@@ -167,14 +183,18 @@ void CNetPlayerInput::PreUpdate()
 				moveRequest.ClearBodyTarget();
 			}
 
-			/*
-				CryLogAlways("m_curInput.bodyDirection = {x=%f, y=%f, z=%f}", m_curInput.bodyDirection.x, m_curInput.bodyDirection.y, m_curInput.bodyDirection.z);
-				CryLogAlways("m_curInput.deltaMovement = {x=%f, y=%f, z=%f}", m_curInput.deltaMovement.x, m_curInput.deltaMovement.y, m_curInput.deltaMovement.z);
-				CryLogAlways("m_curInput.lookDirection = {x=%f, y=%f, z=%f}", m_curInput.lookDirection.x, m_curInput.lookDirection.y, m_curInput.lookDirection.z);
-				CryLogAlways("m_curInput.sprint        = %s", m_curInput.sprint ? "true" : "false");
-				CryLogAlways("m_curInput.leanl         = %s", m_curInput.leanl ? "true" : "false");
-				CryLogAlways("m_curInput.leanr         = %s", m_curInput.leanr ? "true" : "false");
-				*/
+			
+			//	CryLogAlways("m_curInput.bodyDirection = {x=%f, y=%f, z=%f}", m_curInput.bodyDirection.x, m_curInput.bodyDirection.y, m_curInput.bodyDirection.z);
+			//	CryLogAlways("m_curInput.deltaMovement = {x=%f, y=%f, z=%f}", m_curInput.deltaMovement.x, m_curInput.deltaMovement.y, m_curInput.deltaMovement.z);
+			//	CryLogAlways("m_curInput.lookDirection = {x=%f, y=%f, z=%f}", m_curInput.lookDirection.x, m_curInput.lookDirection.y, m_curInput.lookDirection.z);
+			//	CryLogAlways("m_curInput.sprint        = %s", m_curInput.sprint ? "true" : "false");
+				//CryLogAlways("m_curInput.leanl         = %s", m_curInput.leanl ? "true" : "false");
+				//CryLogAlways("m_curInput.leanr         = %s", m_curInput.leanr ? "true" : "false");
+				
+		}
+		else {
+			m_lastPseudoSpeed = pseudoSpeed;
+			m_lastSprint = m_curInput.sprint;
 		}
 	}
 
@@ -195,18 +215,20 @@ void CNetPlayerInput::Update()
 
 		m_pPlayer->GetGameObject()->ChangedNetworkState(INPUT_ASPECT);
 	}
-	/*
-	// Server test
-	if (m_curInput.deltaMovement.GetLength() == 0) {
-		if (m_pPlayer)
-		{
-			CMovementRequest mr;
-			mr.ClearLookTarget();
-			m_pPlayer->GetMovementController()->RequestMovement(mr);
+	
 
-			CryLogAlways("stop.!");
-		}
-	}*/
+
+	// Server test
+	//if (m_curInput.deltaMovement.GetLength() == 0) {
+	//	if (m_pPlayer)
+	//	{
+	//		CMovementRequest mr;
+	//		mr.ClearLookTarget();
+	//		m_pPlayer->GetMovementController()->RequestMovement(mr);
+
+		//	CryLogAlways("stop.!");
+		//}
+	//}
 
 	if (m_pPlayer)
 		m_pPlayer->m_netLookDirection = m_curInput.lookDirection;
@@ -216,6 +238,8 @@ void CNetPlayerInput::Update()
 void CNetPlayerInput::PostUpdate()
 {
 }
+
+
 
 void CNetPlayerInput::SetState(const SSerializedPlayerInput& input)
 {

@@ -18,6 +18,7 @@
 #include "CryGame/GameRules.h"
 
 // Server
+#include "FireModes/Single.h"
 #include "CryMP/Server/Server.h"
 //#include "CryMP/Server/Anticheat.h"
 
@@ -47,7 +48,7 @@
 		if (gEnv->pTimer->GetCurrTime() >= m_nextCheck) { \
 			m_nextCheck += g_pServerCVars->server_anticheat_weaponCheckInterval; \
 			IActor *pOwnerActor = GetOwnerActor(); \
-			if (!gServer->GetAC()->CheckOwnerRequest(pNetChannel, pOwnerActor?pOwnerActor->GetEntityId():0, "RMI Spoof", __FUNCTION__, ScriptHandle(GetEntityId()))) \
+			if (!gServer->GetAC()->CheckOwnerRequest(pNetChannel, pOwnerActor?pOwnerActor->GetEntityId():0, "RMI Spoof", __FUNCTION__, false, ScriptHandle(GetEntityId()))) \
 				return false; \
 		} \
 	}
@@ -61,6 +62,7 @@
             return false; \
         } \
     }
+
 
 
 
@@ -253,6 +255,7 @@ void CWeapon::RequestShoot(IEntityClass* pAmmoType, const Vec3 &pos, const Vec3 
 	{
 		if (IsServerSpawn(pAmmoType) || forceExtended)
 		{
+		//	CryLogAlways("ex:");
 			GetGameObject()->InvokeRMI(CWeapon::ClShoot(), ClShootParams(pos+dir*5.0f, predictionHandle), eRMI_ToAllClients);
 			NetShootEx(pos, dir, vel, hit, extra, predictionHandle);
 		}
@@ -260,6 +263,7 @@ void CWeapon::RequestShoot(IEntityClass* pAmmoType, const Vec3 &pos, const Vec3 
 		{
 			GetGameObject()->InvokeRMI(CWeapon::ClShoot(), ClShootParams(hit, predictionHandle), eRMI_ToAllClients);
 			NetShoot(hit, predictionHandle);
+			//CryLogAlways("norm:");
 		}
 	}
 }
@@ -445,6 +449,21 @@ IMPLEMENT_RMI(CWeapon, SvRequestStopFire)
 	if (!isLocal)
 		NetStopFire();
 
+	// ===============
+	// Rapid Fire
+
+	sv_is_rmi_firing = false;
+	if (pActor && pActor->m_rapidFire > 0)
+	{
+		if (m_fm)
+		{
+			if (CSingle* pSingleFM = static_cast<CSingle*> (m_fm))
+			{
+				pSingleFM->m_sv_rfSeq = 0; // reset seq
+			}
+		}
+	}
+
 	return true;
 }
 
@@ -517,6 +536,8 @@ IMPLEMENT_RMI(CWeapon, SvRequestShoot)
 		// TODO: AC
 		//if (!gServer->GetAC()->CheckLongpoke(pActor, params.seq))
 		//	return false;
+
+		Sv_CheckRapidFire();
 	}
 
 	return true;
@@ -553,6 +574,7 @@ IMPLEMENT_RMI(CWeapon, SvRequestShootEx)
 		//CryLogAlways("nc");
 		gServer->GetEvents()->Call("ServerRPC.Callbacks.OnShoot", pActor ? pActor->GetEntity()->GetScriptTable() : 0, GetEntity()->GetScriptTable(), ScriptHandle(m_lastFiredAmmoId), m_lastFiredAmmoClass, params.pos, params.hit, params.dir);
 
+		Sv_CheckRapidFire();
 		// TODO: AC
 		//if (!gServer->GetAC()->CheckLongpoke(pActor, params.seq))
 		//	return false;

@@ -41,26 +41,52 @@ void CBullet::HandleEvent(const SGameObjectEvent& event)
 
 	if (event.event == eGFE_OnCollision)
 	{
+
+
 		if (m_destroying)
 			return;
+
+		//CryLogAlways("CBullet::HandleEvent(eGFE_OnCollision)");
 
 		EventPhysCollision* pCollision = reinterpret_cast<EventPhysCollision*>(event.ptr);
 		if (!pCollision)
 			return;
 
+		//CryLogAlways("CBullet::HandleEvent(eGFE_OnCollision) Collision Ok.");
+
+	
 		IEntity* pTarget = pCollision->iForeignData[1] == PHYS_FOREIGN_ID_ENTITY ? (IEntity*)pCollision->pForeignData[1] : 0;
+		if (!pTarget) {
+			/*
+			if (CWeapon* pWeapon = GetWeapon()) {
+
+				if (pWeapon->Sv_IsFiring) {
+
+					
+				}
+			}*/
+
+			/*
+			IEntity* pStereo = pCollision->iForeignData[2] == PHYS_FOREIGN_ID_ENTITY ? (IEntity*)pCollision->pForeignData[2] : 0;
+			if (pStereo) {
+				CryLogAlways("Stereo taret %s", pStereo->GetName());
+			}*/
+		}
 
 		//CryMP: This should fix most rail glitches
 		const int idmat = pCollision->idmat[1];
 		if (!pTarget && (idmat == 180 || idmat == 189 || idmat == 219))
 		{
-			//CryLogAlways("$3Rail Glitch: $8Mat: %d This hit would have been blocked otherwise", idmat);
+			CryLogAlways("$3Rail Glitch: $8Mat: %d This hit would have been blocked otherwise", idmat);
 			return;
 		}
 
 		//Only process hits that have a target
 		if (pTarget)
 		{
+
+			//CryLogAlways("CBullet::HandleEvent(eGFE_OnCollision) Target Ok. It's %s", pTarget->GetName());
+
 			Vec3 dir(0, 0, 0);
 			if (pCollision->vloc[0].GetLengthSquared() > 1e-6f)
 				dir = pCollision->vloc[0].GetNormalized();
@@ -125,6 +151,9 @@ void CBullet::HandleEvent(const SGameObjectEvent& event)
 		}
 		else
 		{
+
+			//CryLogAlways("CBullet::HandleEvent(eGFE_OnCollision) No Target.");
+
 			// Notify AI
 			// The above case only catches entity vs. entity hits, the AI is interested in all hits.
 			if (gEnv->pAISystem && !gEnv->bMultiplayer)

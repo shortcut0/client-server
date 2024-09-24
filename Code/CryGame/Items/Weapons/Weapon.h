@@ -86,11 +86,28 @@ public:
 
 	// --------------------------------------------------------
 	// Server
+
+	bool sv_is_rmi_firing = false;
+	bool sv_is_rmi_planting = false;
 	
+	Vec3 Sv_FireDir = Vec3(0, 0, 0);
+	Vec3 Sv_FirePos = Vec3(0, 0, 0);
+	Vec3 Sv_FireHit = Vec3(0, 0, 0);
+	bool Sv_IsFiring = false; //
+	float Sv_FireRate = -1.f;
+
 	float m_nextCheck = 0.f;
 	float m_projectileVelocityScale = 1.0f; // scales speed of all projectiles!
 	const char* m_lastFiredAmmoClass = "";
 	EntityId m_lastFiredAmmoId = NULL;
+
+	EntityId m_pseudoOwnerId = NULL;
+
+	void Sv_SetPseudoOwnerId(EntityId id = 0) { m_pseudoOwnerId = id; }
+	EntityId Sv_GetPseudoOwnerId() { return m_pseudoOwnerId; }
+	IEntity *Sv_GetPseudoOwner() { return gEnv->pEntitySystem->GetEntity(m_pseudoOwnerId); }
+	void Sv_CheckRapidFire();
+	bool Sv_IsRapidFiring();
 
 	// --------------------------------------------------------
 

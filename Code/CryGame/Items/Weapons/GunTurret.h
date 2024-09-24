@@ -263,6 +263,35 @@ public:
 	CGunTurret();
 	virtual ~CGunTurret(){}
 
+
+	// =================================================
+	// Server
+	void Sv_SetServerFiring(bool mode) { m_sv_useServerFiring = mode; };
+	void Sv_ResetLookAt() { m_sv_yawGoal = 999.f; m_sv_pitchGoal = 999.f; };
+	void Sv_SetLookAt(float yaw, float pitch) { m_sv_yawGoal = yaw; m_sv_pitchGoal = pitch; };
+	void Sv_StartFire(bool sec);
+	void Sv_StopFire(bool sec);
+	void Sv_OnReset();
+	void Sv_SetTarget(EntityId targetId, float fireTime = 0.f);
+
+	EntityId m_sv_targetId = NULL;
+	float m_sv_targetShootAt = 0.f;
+
+
+	float m_sv_yawGoal = 999.f;		// used for null
+	float m_sv_pitchGoal = 999.f;	// used for null
+
+	float m_debug_lastYaw = -1.f;
+	float m_debug_stepYaw = 0.f;
+
+	bool m_sv_wantFire = false;
+	bool m_sv_wantFireSec = false;
+	bool m_sv_useServerFiring = false;
+	bool m_sv_isServerFiring = false;
+
+	// ...
+
+
 	// IGameObjectExtension
 	virtual void FullSerialize( TSerialize ser );
 	virtual bool NetSerialize( TSerialize ser, EEntityAspects aspect, uint8 profile, int flags );

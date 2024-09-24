@@ -116,6 +116,15 @@ public:
 	CPlant();
 	virtual ~CPlant();
 
+
+	// =================================
+	// Server
+
+	float m_plantSpeedMult = 1.f;
+	float m_sv_nextPlantTime = 0.f;
+
+	// ...
+
 	virtual void Init(IWeapon *pWeapon, const struct IItemParamsNode *params);
 	virtual void Update(float frameTime, unsigned int frameId);
 	virtual void PostUpdate(float frameTime) {};

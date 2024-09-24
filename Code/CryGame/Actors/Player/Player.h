@@ -701,7 +701,7 @@ public:
 	void RemoveAllExplosives(float timeDelay, uint8 typeId = 0xff);
 	void RemoveExplosiveEntity(EntityId entityId);
 	void RecordExplosivePlaced(EntityId entityId, uint8 typeId);
-	void RecordExplosiveDestroyed(EntityId entityId, uint8 typeId);
+	void RecordExplosiveDestroyed(EntityId entityId, uint8 typeId, bool exploded = true);
 
 	//First person fists/hands actions
 	void EnterFirstPersonSwimming();

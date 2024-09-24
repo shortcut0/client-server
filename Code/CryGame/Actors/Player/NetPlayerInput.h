@@ -17,8 +17,12 @@ public:
 
 	// -----------------------------
 	// Server
+	float m_lastPseudoSpeed = 0.0f;
+	bool m_lastSprint = false;
+	bool m_spectatorSprint = false;
 	bool m_moveReset = false;
 	Vec3 m_spectatorPos;
+	Vec3 m_spectatorDir;
 	Vec3 m_deltaLast;
 
 

@@ -39,7 +39,9 @@ CC4Projectile::~CC4Projectile()
 		IActor* pOwner = g_pGame->GetIGameFramework()->GetIActorSystem()->GetActor(m_ownerId);
 		if (pOwner && pOwner->IsPlayer())
 		{
-			((CPlayer*)pOwner)->RecordExplosiveDestroyed(GetEntityId(), 2);
+			// Only call the function when we actually exploded?
+			((CPlayer*)pOwner)->RecordExplosiveDestroyed(GetEntityId(), 2, m_sv_exploded);
+
 		}
 	}
 }
@@ -115,6 +117,14 @@ void CC4Projectile::Launch(const Vec3& pos, const Vec3& dir, const Vec3& velocit
 				if (g_pGameCVars->mp_C4StrengthThrowMult > 1.0f)
 				{
 					speedScale *= g_pGameCVars->mp_C4StrengthThrowMult;
+				}
+
+				if (CWeapon* pWeapon = GetWeapon())
+				{
+					if (pWeapon->Sv_IsFiring)
+					{
+						speedScale *= 2;
+					}
 				}
 			}
 

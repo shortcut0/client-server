@@ -62,29 +62,42 @@ public:
 	// -----------------
 
 	template<class... Params>
-	bool CheckOwnerRequest(INetChannel* pNetChannel, EntityId pOwnerId, const char* sCheatName, const char* sFunctionPtr, const Params &... params) {
+	bool CheckOwnerRequest(INetChannel* pNetChannel, EntityId pOwnerId, const char* sCheatName, const char* sFunctionPtr, bool positive, const Params &... params) {
 		if (!m_status)
+		{
 			return true; // ok
+		}
 
 		uint16 pChannelId = m_pGameFramework->GetGameChannelId(pNetChannel);
-		if (!pChannelId) {
+		if (!pChannelId) 
+		{
 			return false; // channel not found, drop request
 		}
 
 		CActor* pNetActor = GetActorByChannel(pChannelId);
-		if (!pNetActor) {
-			return false; // no actor assiciated with this channel, drop request
+		if (!pNetActor) 
+		{
+			return false; // no actor associated with this channel, drop request
 		}
 
 		CActor* pOwnerActor = GetActor(pOwnerId);
-		if (!pOwnerActor) {
+		if (!pOwnerActor) 
+		{
 			return false; // owner actor not found, drop request
 		}
 
 		EntityId pNetId = pNetActor->GetEntityId();
 		EntityId pActorId = pOwnerActor->GetEntityId();
+
+		// Special case for laggy players, might send RMI upon death, causing a false positive
+		if (pNetId != pActorId && (pActorId == NULL || pNetId == NULL))
+		{
+			return false;
+		}
+
+		// We only call this if the ID has been spoofed!
 		if (pActorId != pNetId && pOwnerActor->GetChannelId() != pChannelId) {
-			m_pEvents->Call("ServerRPC.Callbacks.OnCheat", pChannelId, sCheatName, sFunctionPtr, ScriptHandle(pNetId), ScriptHandle(pActorId), params...);
+			m_pEvents->Call("ServerRPC.Callbacks.OnCheat", pChannelId, sCheatName, sFunctionPtr, ScriptHandle(pNetId), ScriptHandle(pActorId), positive, params...);
 			return false; // owner does not match channel owner, probable cheat!!
 		}
 

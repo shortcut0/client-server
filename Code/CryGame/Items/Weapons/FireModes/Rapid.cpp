@@ -130,7 +130,20 @@ void CRapid::Update(float frameTime, unsigned int frameId)
 		{
 			if (!OutOfAmmo())
 			{
-				if (m_netshooting)
+				if (m_pWeapon->Sv_IsFiring) {
+
+					// moved to single.cpp
+					if (!m_sv_isSingleGroup)
+					{
+						float curr_time = gEnv->pTimer->GetCurrTime();
+						if (curr_time >= m_sv_nextShotTime) {
+							Firing(Shoot(true, false));
+							m_sv_nextShotTime = curr_time + (m_next_shot_dt * 1.5);
+						}
+					}
+					/**/
+				}
+				else if (m_netshooting)
 					Firing(true);
 				else
 					Firing(Shoot(true, false));

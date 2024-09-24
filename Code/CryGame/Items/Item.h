@@ -146,7 +146,7 @@ public:
 	enum eGeometrySlot
 	{
 		eIGS_FirstPerson = 0,
-		eIGS_ThirdPerson,
+			eIGS_ThirdPerson,
 		eIGS_Arms,
 		eIGS_Aux0,
 		eIGS_Owner,

@@ -38,6 +38,10 @@ public:
 
 private:
 
+	// Server
+	// bool m_sv_exploded = false; // in CProjectile.h!!
+	// ...
+
 	void Stick(EventPhysCollision *pCollision);
 	void StickToStaticObject(EventPhysCollision *pCollision, IPhysicalEntity* pTarget);
 	void StickToEntity(IEntity* pEntity, Matrix34 &localMatrix);

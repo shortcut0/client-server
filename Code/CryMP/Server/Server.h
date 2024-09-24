@@ -22,6 +22,7 @@
 #include "ServerStats.h"
 #include "AntiCheat.h"
 
+#include "ServerTimer.h"
 #include "ServerCVars.h"
 #include "ServerUtils.h"
 #include "ServerEvents.h"
@@ -48,6 +49,10 @@ enum class EGameSpyUpdateType {
 // ---------------------------------
 class Server : public IGameFrameworkListener, public ILevelSystemListener, public IEntitySystemSink
 {
+	
+	//IGameFramework* m_pGameFramework = nullptr;
+	IGame* m_pGame = nullptr;
+
 	// ------------------------------
 	static void m_pExitHandler();
 
@@ -65,6 +70,7 @@ class Server : public IGameFrameworkListener, public ILevelSystemListener, publi
 	std::unique_ptr<ServerUtils> m_pServerUtils;
 	std::unique_ptr<ServerStats> m_pServerStats;
 	std::unique_ptr<ServerAnticheat> m_pAC;
+	std::unique_ptr<ServerTimer> m_pServerTimer;
 
 	// ------------------------------
 
@@ -94,14 +100,6 @@ class Server : public IGameFrameworkListener, public ILevelSystemListener, publi
 
 	IScriptSystem* m_pSS = nullptr;
 	std::string m_serverScriptPath;
-	SmartScriptTable m_ATOMLua;
-	SmartScriptTable m_ServerRPCLua;
-	SmartScriptTable m_ServerRPCCallbackLua;
-	bool m_ATOMLuaInitialized = false;
-	bool m_bLevelLoaded = false;
-	bool m_bLuaLoaded = false;
-
-	void InitServerLua();
 
 public:
 
@@ -112,26 +110,62 @@ public:
 	// ---------------------------------
 	void Quit() { m_pExitHandler(); };
 
-	// ---------------------------------
-	// Overwrites input script path 
-	bool OverwriteScriptPath(std::string &output, const std::string& input);
 
-	// ---------------------------------
+	// ============== LOGS =============
 	void Log(const char* format, ...); //
 	void LogError(const char* format, ...); // Error:
 	void LogWarning(const char* format, ...); // Warning:
 
-	// ------------------------------
+	// ============== INIT =============
 	void Init(IGameFramework* pGameFramework);
-	void InitLua();
 	void OnGameStart(IGameObject *pGameRules);
 	void UpdateLoop();
 
+	// ============== SCRIPTS =============
+
+	ServerTimer m_ScriptSecondTimer;
+	ServerTimer m_ScriptMinuteTimer;
+	ServerTimer m_ScriptHourTimer;
+
+	void InitScript();
+	void RegisterScriptGlobals();
+	void LoadScript(bool ForceInit = false);
+	void HandleScriptError(const std::string& error);
+	void OnScriptLoaded(const std::string& fileName);
+	bool OverwriteScriptPath(std::string& output, const std::string& input);
+
+	bool IsLuaReady() const
+	{
+		bool error = false;
+		if (m_pSS)
+		{
+			if (m_pSS->GetGlobalValue("SCRIPT_ERROR", error) && error)
+			{
+				return false;
+			}
+		}
+
+		return (m_ScriptLoaded && m_ScriptInitialized);
+	}
+
+	bool m_ScriptInitialized = false;
+	bool m_ScriptLoaded = false;
+
+
 	// ------------------------------
 	EntityId m_lastSpawnId = 0;
-
+	int m_spawnCounter = 0;
 	int m_counter = 0;
+
 	int GetCounter() { m_counter++; return m_counter; };
+
+	/*
+	std::vector<std::string> m_uniqueNames;
+	const char* GetUniqueName(const char* name) { 
+		int c=GetCounter();  
+		m_uniqueNames.push_back(std::string(name)+"_"+std::to_string(c));
+		return m_uniqueNames[m_uniqueNames.size()-1].c_str();
+	};*/
 
 	// ------------------------------
 	void InitCVars(IConsole* pConsole);
@@ -145,114 +179,24 @@ public:
 	std::string GetMasterServerAPI(const std::string& master);
 
 	// ------------------------------
-	IGameFramework* GetGameFramework()
-	{
-		return m_pGameFramework;
-	}
+	IGameFramework* GetGameFramework() { return m_pGameFramework; }
+	Executor* GetExecutor() { return m_pExecutor.get(); }
+	HTTPClient* GetHTTPClient() { return m_pHttpClient.get(); }
+	INetworkService* GetGSMaster() const { return m_pGSMaster; }
 
-	Executor* GetExecutor()
-	{
-		return m_pExecutor.get();
-	}
+	ServerEvents* GetEvents() const { return m_pEventsCallback.get(); }
+	ServerUtils* GetUtils() { return m_pServerUtils.get(); }
+	ServerAnticheat* GetAC() { return m_pAC.get(); }
+	ServerStats* GetStats() { return m_pServerStats.get(); }
+	LuaFileSystem* GetLFS() const { return m_pLuaFileSystem.get(); }
+	ServerTimer* GetTimer() const { return m_pServerTimer.get(); }
+	std::string GetRoot() const { return m_rootDir.string(); }
+	std::string GetWorkingDir() const { return m_workingDir.string(); }
 
-	ServerUtils* GetUtils()
-	{
-		return m_pServerUtils.get();
-	}
-
-	ServerAnticheat* GetAC()
-	{
-		return m_pAC.get();
-	}
-
-	ServerStats* GetStats()
-	{
-		return m_pServerStats.get();
-	}
-
-	HTTPClient* GetHTTPClient()
-	{
-		return m_pHttpClient.get();
-	}
-
-	//ServerPublisher* GetServerPublisher()
-	//{
-	//	return m_pServerPublisher.get();
-	//}
-
-	ServerEvents* GetEvents() const
-	{
-		return m_pEventsCallback.get();
-	}
-
-	LuaFileSystem* GetLFS() const
-	{
-		return m_pLuaFileSystem.get();
-	}
-
-	const std::vector<std::string>& GetMasters() const
-	{
-		return m_masters;
-	}
-
-	EntityId GetLastSpawnId() const
-	{
-		return m_lastSpawnId;
-	}
-
-	SmartScriptTable GetATOMLua() const
-	{
-		return m_ATOMLua;
-	}
-
-	SmartScriptTable GetLuaServerRPC() const
-	{
-		return m_ServerRPCLua;
-	}
-
-	bool IsLuaReady() const
-	{
-		bool error = false;
-		if (m_pSS)
-			m_pSS->GetGlobalValue("SCRIPT_ERROR", error);
-
-		if (!m_bLuaLoaded) {
-			return false;
-		}
-
-		if (!m_ServerRPCCallbackLua)
-			return false;
-
-		if (!m_ServerRPCLua)
-			return false;
-
-		if (!m_ATOMLua)
-			return false;
-
-		return !error && m_ATOMLuaInitialized;
-	}
-
-	std::string GetRoot() const
-	{
-		return m_rootDir.string();
-	}
-
-	std::string GetWorkingDir() const
-	{
-		return m_workingDir.string();
-	}
-
-	INetworkService *GetGSMaster() const
-	{
-		return m_pGSMaster;
-	}
+	const std::vector<std::string>& GetMasters() const { return m_masters; }
+	EntityId GetLastSpawnId() const { return m_lastSpawnId; }
 
 	bool UpdateGameSpyServerReport(EGameSpyUpdateType type, const char* key, const char* value, int index = 0);
-
-
-	bool m_bErrorHandledFrame = false;
-	void HandleScriptError(const std::string &error);
-	
 
 private:
 	// IGameFrameworkListener
@@ -286,6 +230,10 @@ private:
 	float m_hourGoal = 0;
 
 	int m_lastChannel = 0;
+
+	// Debug
+	ServerTimer m_DebugTimer;
+	void Debug();
 };
 
 ///////////////////////

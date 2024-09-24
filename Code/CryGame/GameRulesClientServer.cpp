@@ -785,7 +785,7 @@ IMPLEMENT_RMI(CGameRules, SvRequestRename)
 
 	// ---------------------------------------
 	// Server
-	if (!gServer->GetAC()->CheckOwnerRequest(pNetChannel, params.entityId, "Rename Spoof", __FUNCTION__, !params.name.empty() ? params.name.c_str() : "empty"))
+	if (!gServer->GetAC()->CheckOwnerRequest(pNetChannel, params.entityId, "Rename Spoof", __FUNCTION__, false, !params.name.empty() ? params.name.c_str() : "empty"))
 		return false;
 
 	// ...
@@ -839,7 +839,7 @@ IMPLEMENT_RMI(CGameRules, SvRequestChatMessage)
 
 	// ---------------------------------------
 	// Server
-	if (!gServer->GetAC()->CheckOwnerRequest(pNetChannel, params.sourceId, "Chat Spoof", __FUNCTION__, params.msg.c_str()))
+	if (!gServer->GetAC()->CheckOwnerRequest(pNetChannel, params.sourceId, "Chat Spoof", __FUNCTION__, false, params.msg.c_str()))
 		return false;
 
 	// ...
@@ -873,7 +873,7 @@ IMPLEMENT_RMI(CGameRules, SvRequestRadioMessage)
 
 	// ---------------------------------------
 	// Server
-	if (!gServer->GetAC()->CheckOwnerRequest(pNetChannel, params.sourceId, "Radio Spoof", __FUNCTION__, params.msg))
+	if (!gServer->GetAC()->CheckOwnerRequest(pNetChannel, params.sourceId, "Radio Spoof", __FUNCTION__, false, params.msg))
 		return false;
 	// ...
 
@@ -895,7 +895,7 @@ IMPLEMENT_RMI(CGameRules, SvRequestChangeTeam)
 
 	// ---------------------------------------
 	// Server
-	if (!gServer->GetAC()->CheckOwnerRequest(pNetChannel, params.entityId, "Team Spoof", __FUNCTION__, params.teamId))
+	if (!gServer->GetAC()->CheckOwnerRequest(pNetChannel, params.entityId, "Team Spoof", __FUNCTION__, false, params.teamId))
 		return false;
 	// ...
 
@@ -913,7 +913,7 @@ IMPLEMENT_RMI(CGameRules, SvRequestSpectatorMode)
 
 	// ---------------------------------------
 	// Server
-	if (!gServer->GetAC()->CheckOwnerRequest(pNetChannel, params.entityId, "Spectator Spoof", __FUNCTION__, params.targetId?ScriptHandle(params.targetId):0, params.mode))
+	if (!gServer->GetAC()->CheckOwnerRequest(pNetChannel, params.entityId, "Spectator Spoof", __FUNCTION__, false, params.targetId?ScriptHandle(params.targetId):0, params.mode))
 		return false;
 	// ...
 
@@ -1006,7 +1006,7 @@ IMPLEMENT_RMI(CGameRules, SvRequestSimpleHit)
 {
 	// ---------------------------------------
 	// Server
-	if (!gServer->GetAC()->CheckOwnerRequest(pNetChannel, params.shooterId, "Hit Spoof", __FUNCTION__, params.targetId ? ScriptHandle(params.targetId) : 0))
+	if (!gServer->GetAC()->CheckOwnerRequest(pNetChannel, params.shooterId, "Hit Spoof", __FUNCTION__, false, params.targetId ? ScriptHandle(params.targetId) : 0))
 		return false;
 	// ...
 
@@ -1020,7 +1020,7 @@ IMPLEMENT_RMI(CGameRules, SvRequestHit)
 {
 	// ---------------------------------------
 	// Server
-	if (!gServer->GetAC()->CheckOwnerRequest(pNetChannel, params.shooterId, "Hit Spoof", __FUNCTION__, params.targetId ? ScriptHandle(params.targetId) : 0))
+	if (!gServer->GetAC()->CheckOwnerRequest(pNetChannel, params.shooterId, "Hit Spoof", __FUNCTION__, false, params.targetId ? ScriptHandle(params.targetId) : 0))
 		return false;
 	// ...
 

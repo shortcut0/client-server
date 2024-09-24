@@ -502,6 +502,11 @@ bool ScriptSystem::ExecuteFile(const char *fileName, bool raiseError, bool force
 
 			this->RemoveFromScripts(fileName);
 		}
+		else
+		{
+			//const std::string file(fileName);
+			gServer->OnScriptLoaded(fileName);
+		}
 	}
 
 	if (forceReload)

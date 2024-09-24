@@ -1383,11 +1383,14 @@ bool CPlayer::ProcessProceduralLean(float frameTime)
 
 void CPlayer::PrePhysicsUpdate()
 {
-	if (!IsClient())
+	// ========================================
+	// Server (Fixes spectator position desync)
+	if (!gEnv->bServer && !IsClient())
 	{
 		if (GetPhysicsProfile() == eAP_Ragdoll || GetPhysicsProfile() == eAP_Spectator)
 			return;
 	}
+	// ...
 
 	FUNCTION_PROFILER(GetISystem(), PROFILE_GAME);
 
@@ -3731,6 +3734,9 @@ bool CPlayer::IsThirdPerson() const
 }
 
 
+
+
+
 void CPlayer::Revive(ReasonForRevive reason)
 {
 	if (ShouldUseMPParams())
@@ -3948,6 +3954,8 @@ void CPlayer::Revive(ReasonForRevive reason)
 	}
 }
 
+
+
 void CPlayer::Kill()
 {
 	//CryMP
@@ -4113,6 +4121,16 @@ void CPlayer::RagDollize(bool fallAndPlay)
 	}
 }
 
+
+
+
+
+
+
+
+
+
+
 void CPlayer::PostPhysicalize()
 {
 	CActor::PostPhysicalize();
@@ -4179,6 +4197,8 @@ void CPlayer::PostPhysicalize()
 		}
 	}
 }
+
+
 
 void CPlayer::UpdateAnimGraph(IAnimationGraphState* pState)
 {
@@ -4738,6 +4758,7 @@ void CPlayer::SelectItem(EntityId itemId, bool keepHistory)
 	GetGameObject()->ChangedNetworkState(ASPECT_CURRENT_ITEM);
 }
 
+
 bool CPlayer::SetAspectProfile(EEntityAspects aspect, uint8 profile)
 {
 	uint8 currentphys = GetGameObject()->GetAspectProfile(eEA_Physics);
@@ -4780,6 +4801,8 @@ bool CPlayer::SetAspectProfile(EEntityAspects aspect, uint8 profile)
 
 	return res;
 }
+
+
 
 bool CPlayer::NetSerialize(TSerialize ser, EEntityAspects aspect, uint8 profile, int flags)
 {
@@ -5746,6 +5769,104 @@ void CPlayer::SetFlyMode(uint8 flyMode)
 		m_pAnimatedCharacter->RequestPhysicalColliderMode((m_stats.flyMode == 2) ? eColliderMode_Disabled : eColliderMode_Undefined, eColliderModeLayer_Game, "Player::SetFlyMode");
 }
 
+
+
+
+
+
+
+
+
+
+
+// FIXME: UNDO
+
+void CPlayer::SetSpectatorMode(uint8 mode, EntityId targetId)
+{
+	//CryLog("%s setting spectator mode %d, target %d", GetEntity()->GetName(), mode, targetId);
+
+	uint8 oldSpectatorMode = m_stats.spectatorMode;
+	bool server = gEnv->bServer;
+	if (server)
+		m_stats.spectatorHealth = -1;	// set this in all cases to trigger a send if necessary
+
+	if (gEnv->bClient)
+		m_pPlayerInput.reset();
+
+	if (mode && !m_stats.spectatorMode)
+	{
+		if (IVehicle* pVehicle = GetLinkedVehicle())
+		{
+			if (IVehicleSeat* pSeat = pVehicle->GetSeatForPassenger(GetEntityId()))
+				pSeat->Exit(false);
+		}
+
+		Revive();
+
+		if (server)
+		{
+			GetGameObject()->SetAspectProfile(eEA_Physics, eAP_Spectator);
+			GetGameObject()->InvokeRMI(CActor::ClSetSpectatorMode(), CActor::SetSpectatorModeParams(mode, targetId), eRMI_ToAllClients | eRMI_NoLocalCalls);
+		}
+
+		Draw(false);
+
+		m_stats.spectatorTarget = targetId;
+		m_stats.spectatorMode = mode;
+		m_stats.inAir = 0.0f;
+		m_stats.onGround = 0.0f;
+
+		// spectators should be dead
+		m_health = -1;
+		GetGameObject()->ChangedNetworkState(ASPECT_HEALTH);
+
+		if (mode == CActor::eASM_Follow)
+			MoveToSpectatorTargetPosition();
+	}
+	else if (!mode && m_stats.spectatorMode)
+	{
+		if (server)
+		{
+			GetGameObject()->SetAspectProfile(eEA_Physics, eAP_Alive);
+			GetGameObject()->InvokeRMI(CActor::ClSetSpectatorMode(), CActor::SetSpectatorModeParams(mode, targetId), eRMI_ToAllClients | eRMI_NoLocalCalls);
+		}
+
+		Draw(true);
+
+		m_stats.spectatorTarget = 0;
+		m_stats.spectatorMode = mode;
+		m_stats.inAir = 0.0f;
+		m_stats.onGround = 0.0f;
+	}
+	else if (oldSpectatorMode != mode || m_stats.spectatorTarget != targetId)
+	{
+		m_stats.spectatorTarget = targetId;
+		m_stats.spectatorMode = mode;
+
+		if (server)
+		{
+			//SetHealth(GetMaxHealth());
+			GetGameObject()->InvokeRMI(CActor::ClSetSpectatorMode(), CActor::SetSpectatorModeParams(mode, targetId), eRMI_ToClientChannel | eRMI_NoLocalCalls, GetChannelId());
+		}
+
+		if (mode == CActor::eASM_Follow)
+			MoveToSpectatorTargetPosition();
+	}
+	/*
+	// switch on/off spectator HUD
+	if (IsClient())
+	SAFE_HUD_FUNC(Show(mode==0));
+	*/
+}
+
+
+
+
+
+
+
+
+/*
 void CPlayer::SetSpectatorMode(uint8 mode, EntityId targetId)
 {
 	//CryMP: Crash fix
@@ -5845,6 +5966,16 @@ void CPlayer::SetSpectatorMode(uint8 mode, EntityId targetId)
 	}
 }
 
+
+
+
+
+
+
+
+
+
+*/
 void CPlayer::UpdateFpSpectator(EntityId oldTargetId, EntityId newTargetId)
 {
 	if (!IsClient())
@@ -6765,28 +6896,41 @@ void CPlayer::RecordExplosivePlaced(EntityId entityId, uint8 typeId)
 
 	std::list<EntityId>& explosives = m_explosiveList[typeId];
 
-	if (limit && explosives.size() >= limit)
+	bool no_limit = false;
+	if (CActor* pActor = GetActor(GetEntityId()))
+	{
+		no_limit = pActor->m_godMode > 0;
+	}
+	if (limit && !no_limit)// && explosives.size() >= limit)
 	{
 		// remove the oldest mine.
-		EntityId explosiveId = explosives.front();
-		explosives.pop_front();
-		if (debug)
-			CryLog("%s: Explosive(%d) force removed: %d", GetEntity()->GetName(), typeId, explosiveId);
-		gEnv->pEntitySystem->RemoveEntity(explosiveId);
+
+		while (explosives.size() >= limit)
+		{
+			EntityId explosiveId = explosives.front();
+			explosives.pop_front();
+			//if (debug)
+			//	CryLog("%s: Explosive(%d) force removed: %d", GetEntity()->GetName(), typeId, explosiveId);
+				gServer->Log("%s: Explosive(%d) force removed: %d", GetEntity()->GetName(), typeId, explosiveId);
+
+			gEnv->pEntitySystem->RemoveEntity(explosiveId);
+		}
+
 	}
 	explosives.push_back(entityId);
 
 	// Server
 	IEntity* pEntity = g_pGame->GetIGameFramework()->GetISystem()->GetIEntitySystem()->GetEntity(entityId);
-	if (pEntity) {
-		gServer->GetEvents()->Call("ServerRPC.Callbacks.OnExplosivePlaced", ScriptHandle(GetEntityId()), ScriptHandle(entityId), (int)typeId, (int)explosives.size(), limit);
+	if (pEntity) 
+	{
+		gServer->GetEvents()->Call("ServerRPC.Callbacks.OnExplosivePlaced", ScriptHandle(GetEntityId()), ScriptHandle(entityId), (int)typeId, (int)explosives.size(), no_limit ? 99999 : limit);
 	} //...
 
 	if (debug)
 		CryLog("%s: Explosive(%d) placed: %d, now %d", GetEntity()->GetName(), typeId, entityId, explosives.size());
 }
 
-void CPlayer::RecordExplosiveDestroyed(EntityId entityId, uint8 typeId)
+void CPlayer::RecordExplosiveDestroyed(EntityId entityId, uint8 typeId, bool exploded)
 {
 	bool debug = (g_pGameCVars->g_debugMines != 0);
 
@@ -6807,8 +6951,9 @@ void CPlayer::RecordExplosiveDestroyed(EntityId entityId, uint8 typeId)
 
 	// Server
 	IEntity* pEntity = g_pGame->GetIGameFramework()->GetISystem()->GetIEntitySystem()->GetEntity(entityId);
-	if (pEntity) {
-		gServer->GetEvents()->Call("ServerRPC.Callbacks.OnExplosiveRemoved", ScriptHandle(GetEntityId()), ScriptHandle(entityId), (int)typeId, (int)explosives.size());
+	if (pEntity) 
+	{
+		gServer->GetEvents()->Call("ServerRPC.Callbacks.OnExplosiveRemoved", ScriptHandle(GetEntityId()), ScriptHandle(entityId), (int)typeId, (int)explosives.size(), exploded);
 	} //...
 }
 

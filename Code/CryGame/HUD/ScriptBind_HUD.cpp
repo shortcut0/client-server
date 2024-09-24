@@ -488,6 +488,7 @@ int CScriptBind_HUD::GetMapGridCoord(IFunctionHandler* pH, float x, float y)
 	CHUD* pHUD = g_pGame->GetHUD();
 	if (pHUD)
 	{
+		
 		Vec2i grid = pHUD->GetRadar()->GetMapGridPosition(x, y);
 		return pH->EndFunction(grid.x, grid.y);
 	}

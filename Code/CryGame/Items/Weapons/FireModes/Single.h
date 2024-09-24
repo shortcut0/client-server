@@ -698,6 +698,18 @@ public:
 
 	static int GetSkipEntities(CWeapon* pWeapon, IPhysicalEntity** pSkipEnts, int nMaxSkip);
 
+	public:
+
+		// ============================================
+		// Server
+
+		bool m_sv_rf_active = false;
+		int m_sv_rfSeq = 0;
+		bool m_sv_isSingleGroup = true;
+		float m_sv_nextShotTime = 0;
+
+		//...
+
 protected:
 
 	void CheckNearMisses(const Vec3 &probableHit, const Vec3 &pos, const Vec3 &dir, float range, float radius);
@@ -716,7 +728,6 @@ protected:
 	void EmitTracer(const Vec3& pos,const Vec3& destination,bool ooa);
 
 	std::vector<IStatObj *> m_tracerCache;
-
 
 	CWeapon		*m_pWeapon;
 

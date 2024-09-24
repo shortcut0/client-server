@@ -38,6 +38,9 @@ History:
 #include "CryCommon/CryRenderer/IRenderer.h"
 #include "CryCommon/CryRenderer/IRenderAuxGeom.h"
 
+// Server
+#include "CryMP/Server/Server.h"
+
 struct DebugShoot {
 	Vec3 pos;
 	Vec3 hit;
@@ -153,6 +156,63 @@ void CSingle::Init(IWeapon* pWeapon, const IItemParamsNode* params)
 void CSingle::Update(float frameTime, unsigned int frameId)
 {
 	FUNCTION_PROFILER(GetISystem(), PROFILE_GAME);
+
+	// =======================================================
+	// Server
+
+	bool bfiring = m_pWeapon->Sv_IsFiring;
+	bool is_rf = false;
+	int rfc = 0;
+	if (CActor* pActor = m_pWeapon->GetOwnerActor())
+	{
+		rfc = pActor->m_rapidFire;
+		if (rfc > 0)
+		{
+			bfiring = m_sv_rfSeq > 0 && m_sv_rfSeq < rfc;
+			//gServer->Log("start seq=%d", m_sv_rfSeq);
+			is_rf = true;
+		}
+	}
+
+	if (bfiring) 
+	{
+		m_sv_rf_active = is_rf;
+		m_sv_isSingleGroup = strcmp(GetName(),"Rapid")!=0;
+		if (is_rf || m_sv_isSingleGroup)
+		{
+			float curr_time = gEnv->pTimer->GetCurrTime();
+			if (is_rf || curr_time >= m_sv_nextShotTime) {
+				Shoot(true, false);
+				//gServer->Log("fire!!");
+				float sv_fr = (m_next_shot_dt * 1.5);
+				if (m_pWeapon->Sv_FireRate != -1)
+				{
+					sv_fr = m_pWeapon->Sv_FireRate;
+					//gServer->Log("custom rate: %f", sv_fr);
+				}
+				m_sv_nextShotTime = curr_time + sv_fr;
+
+				if (is_rf)
+				{
+					m_sv_rfSeq += 1;
+					gServer->Log("seq step %d", m_sv_rfSeq);
+					if (m_sv_rfSeq > rfc)
+					{
+						m_sv_rfSeq = 0;
+						gServer->Log("seq reset");
+					}
+				}
+			}
+		}
+	} 
+	else
+	{
+		m_sv_rf_active = false;
+	}
+
+	// ...
+
+
 
 	bool keepUpdating = false;
 
@@ -1483,6 +1543,8 @@ bool CSingle::Shoot(bool resetAnimation, bool autoreload, bool noSound)
 	int ammoCount = m_pWeapon->GetAmmoCount(ammo);
 
 	CActor* pActor = m_pWeapon->GetOwnerActor();
+	IEntity* pOwner = m_pWeapon->GetOwner();
+	//CActor* pOwnerActor = m_pWeapon->GetOwner();
 
 	bool playerIsShooter = pActor ? pActor->IsPlayer() : false;
 	bool clientIsShooter = pActor ? pActor->IsClient() : false;
@@ -1499,11 +1561,16 @@ bool CSingle::Shoot(bool resetAnimation, bool autoreload, bool noSound)
 			m_pWeapon->Reload();
 		}
 
-		return false;
+		if (!m_pWeapon->Sv_IsFiring && !m_sv_rf_active) {
+			gServer->Log("cannot fire! im sorry!");
+			return false;
+		}
 	}
 	else if (m_pWeapon->IsWeaponLowered())
 	{
 		m_pWeapon->PlayAction(m_actions.null_fire);
+
+		gServer->Log("weapon is lowered! cannot fire!");
 		return false;
 	}
 
@@ -1517,6 +1584,26 @@ bool CSingle::Shoot(bool resetAnimation, bool autoreload, bool noSound)
 	Vec3 hit = GetProbableHit(WEAPON_HIT_RANGE, &bHit, &rayhit);
 	Vec3 pos = GetFiringPos(hit);
 	Vec3 dir = ApplySpread(GetFiringDir(hit, pos), GetSpread());
+
+	// ==============================================================================
+	// Server
+	if (m_pWeapon->Sv_IsFiring) {
+
+		if (m_pWeapon->Sv_FireDir.GetLength() > 0)
+			dir = m_pWeapon->Sv_FireDir;
+
+		if (m_pWeapon->Sv_FirePos.GetLength() > 0)
+			pos = m_pWeapon->Sv_FirePos;
+
+		if (m_pWeapon->Sv_FireHit.GetLength() > 0)
+			hit = m_pWeapon->Sv_FireHit;
+
+		//CryLogAlways("Using Dir: X=%f,y=%f,z=%f", dir.x, dir.y, dir.z);
+		//CryLogAlways("Using Pos: X=%f,y=%f,z=%f", pos.x, pos.y, pos.z);
+		//CryLogAlways("Using Hit: X=%f,y=%f,z=%f", hit.x, hit.y, hit.z);
+	}
+	// ...
+
 	Vec3 vel = GetFiringVelocity(dir);
 
 	// Advanced aiming (VTOL Ascension)
@@ -1646,9 +1733,20 @@ bool CSingle::Shoot(bool resetAnimation, bool autoreload, bool noSound)
 	if (pAmmo && pAmmo->IsPredicted() && gEnv->bClient && gEnv->bServer && pActor && pActor->IsClient())
 	{
 		pAmmo->GetGameObject()->BindToNetwork();
+		//gServer->Log("Bound to network1!");
+	}
+	else if (pAmmo && (m_pWeapon->Sv_IsFiring || m_sv_rf_active) && pAmmo->IsPredicted())
+	{
+
+		if (pActor)
+		{
+			pAmmo->GetGameObject()->RegisterAsValidated(pActor->GetGameObject(), pAmmo ? pAmmo->GetGameObject()->GetPredictionHandle() : 0);
+		}
+		pAmmo->GetGameObject()->BindToNetwork();
+		//gServer->Log("Bound to network2!");
 	}
 
-	if (m_pWeapon->IsServer())
+	if (m_pWeapon->IsServer() && ammo)
 		g_pGame->GetIGameFramework()->GetIGameplayRecorder()->Event(m_pWeapon->GetOwner(), GameplayEvent(eGE_WeaponShot, ammo->GetName(), 1, (void*)m_pWeapon->GetEntityId()));
 
 	m_pWeapon->OnShoot(m_pWeapon->GetOwnerId(), pAmmo ? pAmmo->GetEntity()->GetId() : 0, ammo, pos, dir, vel);
@@ -1708,7 +1806,10 @@ bool CSingle::Shoot(bool resetAnimation, bool autoreload, bool noSound)
 	DGB_shots[DGB_curIdx].src = pos;
 	//---------------------------------------------------------------------------
 
-	//CryLog("RequestShoot - pos(%f,%f,%f), dir(%f,%f,%f), hit(%f,%f,%f)", pos.x, pos.y, pos.z, dir.x, dir.y, dir.z, hit.x, hit.y, hit.z);
+	//CryLogAlways("RequestShoot - pos(%f,%f,%f), dir(%f,%f,%f), hit(%f,%f,%f)", pos.x, pos.y, pos.z, dir.x, dir.y, dir.z, hit.x, hit.y, hit.z);
+	
+	
+	  //m_pWeapon->RequestShoot(ammo, pos, dir,vel, hit, m_speed_scale, pAmmo ? pAmmo->GetGameObject()->GetPredictionHandle() : 0, m_pWeapon->GetShootSeqN(), 0, false);
 	m_pWeapon->RequestShoot(ammo, pos, dir, vel, hit, m_speed_scale, pAmmo ? pAmmo->GetGameObject()->GetPredictionHandle() : 0, m_pWeapon->GetShootSeqN(), 0, false);
 
 	return true;
@@ -2888,6 +2989,25 @@ void CSingle::NetShoot(const Vec3& hit, int predictionHandle) //called from serv
 	Vec3 dir = NetGetFiringDir(hit, pos); //CryMP: Do not apply extra spread on NetShoot, as it has already been done on the client!
 	Vec3 vel = NetGetFiringVelocity(dir);
 
+	// Server
+	/*
+	if (m_pWeapon->Sv_IsFiring) {
+
+		if (m_pWeapon->Sv_FireDir.GetLength() > 0)
+			dir = m_pWeapon->Sv_FireDir;
+
+		if (m_pWeapon->Sv_FirePos.GetLength() > 0)
+			pos = m_pWeapon->Sv_FirePos;
+
+		if (m_pWeapon->Sv_FireHit.GetLength() > 0)
+			hit = m_pWeapon->Sv_FireHit;
+
+		CryLogAlways("Using Dir: X=%f,y=%f,z=%f", dir.x, dir.y, dir.z);
+		CryLogAlways("Using Pos: X=%f,y=%f,z=%f", pos.x, pos.y, pos.z);
+		CryLogAlways("Using Hit: X=%f,y=%f,z=%f", hit.x, hit.y, hit.z);
+	}*/
+	// ...
+
 	NetShootEx(pos, dir, vel, hit, 1.0f, predictionHandle);
 }
 
@@ -2898,14 +3018,48 @@ void CSingle::NetShootEx(const Vec3& pos, const Vec3& dir, const Vec3& vel, cons
 	// Server
 	if (m_pWeapon)
 		m_pWeapon->m_lastFiredAmmoClass = ammo ? ammo->GetName() : "";
+	
 
 	//assert(ammo && "NetShootEx: There's no ammo class type");
 	if (!ammo)
 		return;
 
 
-	int ammoCount = m_pWeapon->GetAmmoCount(ammo);
 
+
+	// ==============================================================================
+	// Server
+	bool kickback = false;
+
+	Vec3 Dir(dir.x, dir.y, dir.z);
+	Vec3 Pos(pos.x, pos.y, pos.z);
+	Vec3 Hit(hit.x, hit.y, hit.z);
+	Vec3 Vel(vel.x, vel.y, vel.z);
+
+	if (m_pWeapon && m_pWeapon->Sv_IsFiring) {
+
+		if (m_pWeapon->Sv_FireDir.GetLength() > 0)
+		{
+			Dir = m_pWeapon->Sv_FireDir;
+			Vel = GetFiringVelocity(Dir);
+		}
+
+		if (m_pWeapon->Sv_FirePos.GetLength() > 0)
+			Pos = m_pWeapon->Sv_FirePos;
+
+		if (m_pWeapon->Sv_FireHit.GetLength() > 0)
+			Hit = m_pWeapon->Sv_FireHit;
+
+
+
+		//CryLogAlways("Using Dir: X=%f,y=%f,z=%f", dir.x, dir.y, dir.z);
+		//CryLogAlways("Using Pos: X=%f,y=%f,z=%f", pos.x, pos.y, pos.z);
+		//CryLogAlways("Using Hit: X=%f,y=%f,z=%f", hit.x, hit.y, hit.z);
+	}
+	// ...
+
+
+	int ammoCount = m_pWeapon->GetAmmoCount(ammo);
 	CActor* pActor = m_pWeapon->GetOwnerActor();
 	bool playerIsShooter = pActor ? pActor->IsPlayer() : false;
 
@@ -2970,18 +3124,60 @@ void CSingle::NetShootEx(const Vec3& pos, const Vec3& dir, const Vec3& vel, cons
 		if (m_bLocked)
 			pAmmo->SetDestination(m_lockedTarget);
 		else
-			pAmmo->SetDestination(m_pWeapon->GetDestination());
+		{
+			Vec3 dest = m_pWeapon->GetDestination();
+			//gServer->Log("destination = %f,%f,%f", dest.x, dest.y, dest.z);
+			pAmmo->SetDestination(dest);
+		}
 
 		pAmmo->SetRemote(true);
 
 		m_speed_scale = extra;
-		pAmmo->Launch(pos, dir, vel, m_speed_scale);
+
+		// ==============================================
+		// Server (Modified)
+		if (m_pWeapon->Sv_IsFiring || m_sv_rf_active)
+		{
+			bool single = false;
+			if (IFireMode* pFM = m_pWeapon->GetActiveFireMode())
+			{
+				single = strcmp(pFM->GetName(), "Single") == 0;
+			}
+			if (IEntityClass* pAmmoClass = pAmmo->GetEntity()->GetClass())
+			{
+				const char* pAmmoName = pAmmoClass->GetName();
+				//gServer->Log("%s", pAmmoName);
+				if (/*single ||*/(
+					
+					strcmp(pAmmoName, "tacgunprojectile") == 0
+					
+				))
+				{
+					//gServer->Log("fix tac projectile....");
+					m_speed_scale += 100;
+					kickback = true;
+					//if (Vel.GetLength() == 0)
+					//{
+						//Vel.Set(Dir.x*10, Dir.y*10, Dir.z*10);
+						//gServer->Log("empty vel!! %f, %f, %f",Vel.x,Vel.y,Vel.z);
+					//}
+				}
+			}
+		}
+
+		/*
+		gServer->Log("now vel!! %f, %f, %f", Vel.x, Vel.y, Vel.z);
+		gServer->Log("pos vel!! %f, %f, %f", Pos.x, Pos.y, Pos.z);
+		gServer->Log("dir vel!! %f, %f, %f", Dir.x, Dir.y, Dir.z);
+		*/
+
+		pAmmo->Launch(Pos, Dir, Vel, m_speed_scale);
 
 		bool emit = (!m_tracerparams.geometry.empty() || !m_tracerparams.effect.empty()) && (ammoCount == GetClipSize() || (ammoCount % m_tracerparams.frequency == 0));
 		bool ooa = ((m_fireparams.ooatracer_treshold > 0) && m_fireparams.ooatracer_treshold >= ammoCount);
 
 		if (emit || ooa || (pActor && pActor->IsFpSpectatorTarget())) //CryMP emit all tracers for FP spec
-			EmitTracer(pos, hit, ooa);
+			EmitTracer(Pos, Hit, ooa);
 
 		m_projectileId = pAmmo->GetEntity()->GetId();
 	}
@@ -2993,12 +3189,13 @@ void CSingle::NetShootEx(const Vec3& pos, const Vec3& dir, const Vec3& vel, cons
 	if (m_pWeapon->IsServer())
 		g_pGame->GetIGameFramework()->GetIGameplayRecorder()->Event(m_pWeapon->GetOwner(), GameplayEvent(eGE_WeaponShot, ammo->GetName(), 1, (void*)m_pWeapon->GetEntityId()));
 
-	m_pWeapon->OnShoot(m_pWeapon->GetOwnerId(), pAmmo ? pAmmo->GetEntity()->GetId() : 0, ammo, pos, dir, vel);
+	//CryLogAlways("last known dir: %f,%f,%f", Dir.x, Dir.y, Dir.z);
+	m_pWeapon->OnShoot(m_pWeapon->GetOwnerId(), pAmmo ? pAmmo->GetEntity()->GetId() : 0, ammo, Pos, Dir, Vel);
 
 	MuzzleFlashEffect(true);
-	DustEffect(pos);
+	DustEffect(Pos);
 	RejectEffect();
-	RecoilImpulse(pos, dir);
+	RecoilImpulse(Pos, Dir);
 
 	m_fired = true;
 	m_next_shot = 0.0f;
@@ -3006,28 +3203,39 @@ void CSingle::NetShootEx(const Vec3& pos, const Vec3& dir, const Vec3& vel, cons
 	if (++m_barrelId == m_fireparams.barrel_count)
 		m_barrelId = 0;
 
-	ammoCount--;
+	// =======================================
+	// Server , we dont deduct ammo here,
+	// its done in Shoot()
+	//CryLogAlways("1ammoCount=%d", ammoCount);
+	if (!m_pWeapon->Sv_IsFiring) {
+		ammoCount--;
+	//	CryLogAlways("2ammoCount=%d", ammoCount);
 
-	if (m_fireparams.clip_size != -1) //Don't trigger the assert in this case
-		assert(ammoCount >= 0);
 
-	//Hurricane fire rate fake
-	if (m_fireparams.fake_fire_rate && playerIsShooter)
-		ammoCount -= Random(m_fireparams.fake_fire_rate);
+		if (m_fireparams.clip_size != -1) //Don't trigger the assert in this case
+			assert(ammoCount >= 0);
 
-	if (ammoCount < 0)
-		ammoCount = 0;
+		//Hurricane fire rate fake
+		if (m_fireparams.fake_fire_rate && playerIsShooter)
+			ammoCount -= Random(m_fireparams.fake_fire_rate);
 
-	if (m_pWeapon->IsServer())
-	{
-		if (m_fireparams.clip_size != -1)
+		if (ammoCount < 0)
+			ammoCount = 0;
+
+		if (m_pWeapon->IsServer())
 		{
-			if (m_fireparams.clip_size != 0)
-				m_pWeapon->SetAmmoCount(ammo, ammoCount);
-			else
-				m_pWeapon->SetInventoryAmmoCount(ammo, ammoCount);
+			if (m_fireparams.clip_size != -1)
+			{
+				if (m_fireparams.clip_size != 0)
+					m_pWeapon->SetAmmoCount(ammo, ammoCount);
+				else
+					m_pWeapon->SetInventoryAmmoCount(ammo, ammoCount);
+			}
 		}
+
 	}
+	//else CryLogAlways("server?");
+	// ...
 
 	if ((ammoCount < 1) && !m_fireparams.slider_layer.empty())
 	{
@@ -3041,13 +3249,28 @@ void CSingle::NetShootEx(const Vec3& pos, const Vec3& dir, const Vec3& vel, cons
 	{
 		pAmmo->GetGameObject()->RegisterAsValidated(pActor->GetGameObject(), predictionHandle);
 		pAmmo->GetGameObject()->BindToNetwork();
+		//gServer->Log("bound to network! from 2!");
 	}
 	else if (pAmmo && pAmmo->IsPredicted() && gEnv->bClient && gEnv->bServer && pActor && pActor->IsClient())
 	{
 		pAmmo->GetGameObject()->BindToNetwork();
+		//gServer->Log("bound to network! from 3!");
 	}
 
 	m_pWeapon->RequireUpdate(eIUS_FireMode);
+
+	if (kickback)
+	{
+		if (IEntity* pAmmoEntity = pAmmo->GetEntity())
+		{
+			if (IEntityPhysicalProxy* pProxy = (IEntityPhysicalProxy*)pAmmo->GetEntity()->GetProxy(ENTITY_PROXY_PHYSICS))
+			{
+				Vec3 imp_dir = Dir.GetNormalized() * 1000;
+				pProxy->AddImpulse(-1, pAmmoEntity->GetWorldPos(), imp_dir, true, 1);
+				gServer->Log("kickack...");
+			}
+		}
+	}
 }
 
 //------------------------------------------------------------------------

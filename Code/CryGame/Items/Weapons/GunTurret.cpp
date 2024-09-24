@@ -31,6 +31,7 @@ History:
 
 // Server
 #include "CryMP/Server/ServerCVars.h"
+#include "CryMP/Server/Server.h"
 
 namespace
 {
@@ -212,6 +213,59 @@ void CGunTurret::FullSerialize(TSerialize ser)
 			if (IGameObject* pGameObject = GetGameObject())
 				PostInit(pGameObject);
 		}
+	}
+}
+
+//------------------------------------------------------------------------
+void CGunTurret::Sv_SetTarget(EntityId targetId, float fireTime)
+{
+
+	float currTime = gEnv->pTimer->GetCurrTime();
+	m_sv_targetShootAt = currTime;
+	m_sv_targetId = targetId;
+
+	if (IEntity* pTarget = gEnv->pEntitySystem->GetEntity(targetId))
+	{
+		m_sv_targetShootAt += fireTime;
+	}
+}
+
+//------------------------------------------------------------------------
+void CGunTurret::Sv_OnReset()
+{
+	if (IScriptTable* pScriptTable = GetEntity()->GetScriptTable())
+	{
+		SmartScriptTable props;
+		if (pScriptTable->GetValue("Properties", props))
+			ReadProperties(props);
+	}
+
+	UpdateEntityProperties();
+}
+
+//------------------------------------------------------------------------
+void CGunTurret::Sv_StartFire(bool sec)
+{
+	if (sec)
+	{
+		m_sv_wantFireSec = true;
+	}
+	else
+	{
+		m_sv_wantFire = true;
+	}
+}
+
+//------------------------------------------------------------------------
+void CGunTurret::Sv_StopFire(bool sec)
+{
+	if (sec)
+	{
+		m_sv_wantFireSec = false;
+	}
+	else
+	{
+		m_sv_wantFire = false;
 	}
 }
 
@@ -1204,10 +1258,18 @@ void CGunTurret::UpdateOrientation(float deltaTime)
 		m_turretSound = INVALID_SOUNDID;
 	}
 
+
+
+
 	if (changed)
 	{
 		turretTM.SetRotationXYZ(turretAngles, turretTM.GetTranslation());
 		GetEntity()->SetSlotLocalTM(eIGS_Aux0, turretTM);
+		//gServer->Log("set slot local tm %d %f, %f, %f", (int)eIGS_Aux0, turretAngles.x, turretAngles.y, turretAngles.z);
+	}
+	else
+	{
+		//gServer->Log("unchanged!!");
 	}
 
 	// update weapon  
@@ -1318,6 +1380,8 @@ void CGunTurret::UpdateSearchingGoal(float deltaTime)
 			if (++m_searchHint == m_searchparams.hints.size())
 				m_searchHint = 0;
 		}
+
+	//	gServer->Log("has hints curr %d??",m_searchHint);
 	}
 	else
 	{
@@ -1327,7 +1391,61 @@ void CGunTurret::UpdateSearchingGoal(float deltaTime)
 
 		if (abs(m_goalYaw - yaw) < epsilon_goal)
 			m_searchHint ^= 1;
+
+		//gServer->Log("no hits gy=%f", m_goalYaw);
 	}
+
+	// ==========================
+	// Server
+	if (m_sv_yawGoal != 999.f)
+	{
+		m_goalYaw = m_sv_yawGoal;
+		//gServer->Log("%-20s: old yaw: %f", GetEntity()->GetName(), m_goalYaw);
+		//changed = (turretAngles.z != m_sv_yawGoal);
+		//turretAngles.z = m_sv_yawGoal;
+	}
+ 
+
+	if (m_sv_pitchGoal != 999.f)
+	{
+		m_goalPitch = m_sv_pitchGoal;
+		//gServer->Log("%-20s: old pitch: %f", GetEntity()->GetName(), m_goalPitch);
+		//changed |= (turretAngles.x != m_sv_pitchGoal);
+		//turretAngles.x = m_sv_pitchGoal;
+	}
+
+	/*
+	if (strcmp(GetEntity()->GetName(), "ParticleEffect46") == 0)
+	{
+		if (m_goalYaw != m_debug_lastYaw)
+		{
+
+			gServer->Log("  Yaw: %f", m_goalYaw);
+			gServer->Log("Pitch: %f", m_goalPitch);
+			m_debug_lastYaw = m_goalYaw;
+		}
+
+		m_debug_stepYaw++;
+		if (m_debug_stepYaw > 360)
+		{
+			m_debug_stepYaw = 0;
+		}
+		m_goalYaw = m_debug_stepYaw;
+	}*/
+
+	if (g_pServerCVars->server_turret_debug > 0)
+	{
+
+		m_debug_stepYaw += g_pServerCVars->server_turret_debug_step;
+		if (m_debug_stepYaw >= gf_PI2)
+		{
+			m_debug_stepYaw = -gf_PI2;
+		}
+		m_goalYaw = m_debug_stepYaw;
+
+	}
+
+	// ...
 
 	GetGameObject()->ChangedNetworkState(ASPECT_GOALORIENTATION);
 }
@@ -1392,13 +1510,31 @@ void CGunTurret::UpdatePhysics()
 //------------------------------------------------------------------------
 void CGunTurret::StartFire(bool sec)
 {
+
 	if (g_pGameCVars->i_debug_turrets)
 		CryLog("%s StartFire(%i)", GetEntity()->GetName(), sec + 1);
 
 	if (!sec)
+	{
 		CWeapon::StartFire();
+		if (m_sv_useServerFiring)
+		{
+			//gServer->Log("server fire?");
+			if (CWeapon* pWeapon = static_cast<CWeapon*>(this))
+			{
+				pWeapon->Sv_IsFiring = true;
+				//gServer->Log("Weapon found !!");
+			}
+			CWeapon::SvRequestStartFire();
+			CWeapon::RequestStartFire();
+			m_sv_isServerFiring = true;
+		}
+		//gServer->Log("primary fire");
+	}
 	else if (m_fm2)
+	{
 		m_fm2->StartFire();
+	}
 
 	m_fireHint = 1;
 }
@@ -1410,18 +1546,38 @@ void CGunTurret::StopFire(bool sec)
 		CryLog("%s StopFire(%i)", GetEntity()->GetName(), sec + 1);
 
 	if (!sec)
+	{
+		if (m_sv_isServerFiring)
+		{
+			//gServer->Log("server fire?");
+			if (CWeapon* pWeapon = static_cast<CWeapon*>(this))
+			{
+				pWeapon->Sv_IsFiring = false;
+				//gServer->Log("Weapon found !!");
+			}
+			CWeapon::SvRequestStopFire();
+			CWeapon::RequestStopFire();
+		}
 		CWeapon::StopFire();
+		m_sv_isServerFiring = false;
+	}
 	else if (m_fm2)
+	{
 		m_fm2->StopFire();
+	}
 }
 
 //------------------------------------------------------------------------
 bool CGunTurret::IsFiring(bool sec)
 {
 	if (!sec)
+	{
 		return m_fm->IsFiring();
+	}
 	else if (m_fm2)
+	{
 		return m_fm2->IsFiring();
+	}
 
 	return false;
 }
@@ -1531,8 +1687,23 @@ bool CGunTurret::UpdateBurst(float deltaTime)
 //------------------------------------------------------------------------
 void CGunTurret::ServerUpdate(SEntityUpdateContext& ctx, int update)
 {
+
+	// Server
+	bool bForceUpdate = false;
+	if (IEntity* pThis = GetEntity())
+	{
+		if (IScriptTable* pScript = pThis->GetScriptTable())
+		{
+			SmartScriptTable pProperties(gEnv->pScriptSystem);
+			if (pScript->GetValue("Properties", pProperties))
+			{
+				pScript->GetValue("SvUpdateAlways", bForceUpdate);
+			}
+		}
+	}
+
 	//update parameters. SNH: cache these in MP since they never change.
-	if (!gEnv->bMultiplayer)
+	if (bForceUpdate || !gEnv->bMultiplayer)
 	{
 		UpdateEntityProperties();
 	}
@@ -1654,8 +1825,26 @@ void CGunTurret::ServerUpdate(SEntityUpdateContext& ctx, int update)
 			m_randoms[eRV_UpdateTarget].New();
 		}
 
+		if (!pCurrentTarget) {
+			if (m_sv_targetId != NULL)
+			{
+				if (IEntity* pTarget = gEnv->pEntitySystem->GetEntity(m_sv_targetId))
+				{
+					pCurrentTarget = pTarget;
+					if (!mg)
+					{
+						mg = (m_sv_targetShootAt - gEnv->pTimer->GetCurrTime()) > 0.f;
+					}
+					if (!rocket)
+					{
+						rocket = (m_sv_targetShootAt- gEnv->pTimer->GetCurrTime()) > 1.5f;
+					}
+				}
+			}
+		}
 		if (pCurrentTarget)
 		{
+			//gServer->Log("taget found");
 			if (m_turretparams.surveillance || IsTargetShootable(pCurrentTarget))
 				UpdateGoal(pCurrentTarget, ctx.fFrameTime);
 		}
@@ -1665,8 +1854,20 @@ void CGunTurret::ServerUpdate(SEntityUpdateContext& ctx, int update)
 			{
 				UpdateSearchingGoal(ctx.fFrameTime);
 			}
+			else
+			{
+				//gServer->Log("not searching, standing stilL!");
+			}
 		}
 	}
+
+	// ==============================
+	// Server
+	
+	mg |= m_sv_wantFire;
+	rocket |= m_sv_wantFireSec;
+
+	// ...
 
 	if (m_fm && mg != IsFiring(false))
 	{

@@ -55,6 +55,11 @@ void ServerCVars::InitCVars(IConsole* pConsole)
 
 	// ---------------
 	// Server CVars 
+	pConsole->Register("server_debug_positions", &server_debug_positions, 0, 0,						"Enable/Disable the ghost bug fix");
+
+	pConsole->Register("server_turret_debug", &server_turret_debug, 0, 0,						"Enable/Disable the ghost bug fix");
+	pConsole->Register("server_turret_debug_step", &server_turret_debug_step, 0.05, 0,						"Enable/Disable the ghost bug fix");
+	
 	pConsole->Register("server_ghostbug_fix", &server_ghostbug_fix, 1, 0,						"Enable/Disable the ghost bug fix");
 	pConsole->Register("server_use_hit_queue", &server_use_hit_queue, 0, 0,						"Enable/Disable the hit queue");
 	pConsole->Register("server_use_explosion_queue", &server_use_explosion_queue, 1, 0,			"Enable/Disable the explosion queue");
@@ -68,7 +73,7 @@ void ServerCVars::InitCVars(IConsole* pConsole)
 	pConsole->Register("server_c4_stickToPlayers", &server_c4_stickToPlayers, 1, 0,				"Enable/Disable c4 sticking to players");
 	pConsole->Register("server_c4_stickToAllSpecies", &server_c4_stickToAllSpecies, 1, 0,		"Enable/Disable c4 sticking to all actor species (grunts,aliens,etc)");
 	pConsole->Register("server_c4_stickLimitOne", &server_c4_stickLimitOne, 0, 0,				"Enable/Disable limits the amont of c4 that can stick on an actor to 1");
-	pConsole->Register("server_fix_spectatorDesync", &server_fix_spectatorDesync,1, 0, "Enable/Disable attempts to fix the spectator position desync");
+	pConsole->Register("server_fix_spectatorDesync", &server_fix_spectatorDesync,0, 0, "Enable/Disable attempts to fix the spectator position desync");
 	pConsole->Register("server_spectatorFix_ResetThreshold", &server_spectatorFix_ResetThreshold,1, 0, "Enable/Disable attempts to fix the spectator position desync");
 	
 	// Anti Cheat

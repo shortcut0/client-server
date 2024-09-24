@@ -848,19 +848,44 @@ void CWeapon::Update(SEntityUpdateContext& ctx, int update)
 	if (m_frozen || IsDestroyed())
 		return;
 
+	//gServer->Log("wpn update..");
+
+	bool fm_updated = false;
 	switch (update)
 	{
 	case eIUS_FireMode:
+
 		if (m_fm)
+		{
+			fm_updated = true;
 			m_fm->Update(ctx.fFrameTime, ctx.nFrameID);
+			//gServer->Log("fm update..");
+		}
 		if (m_melee)
+		{
 			m_melee->Update(ctx.fFrameTime, ctx.nFrameID);
+		}
 		break;
 
 	case eIUS_Zooming:
 		if (m_zm)
 			m_zm->Update(ctx.fFrameTime, ctx.nFrameID);
 		break;
+	}
+
+	//gServer->Log("%s", m_fm ? m_fm->GetName() : "null");
+	if (Sv_IsFiring && !fm_updated && m_fm)
+	{
+		const char* fm_name = m_fm->GetName();
+		//gServer->Log("ok=%d", strcmp(fm_name, "Rapid"));
+		if (!strcmp(fm_name, "Rapid"))
+		{
+			//gServer->Log("not rapid!");
+
+			float fFrameTime = gEnv->pTimer->GetFrameTime();
+			float nFrameID = gEnv->pRenderer->GetFrameID();
+			m_fm->Update(fFrameTime, nFrameID);
+		}
 	}
 
 	CItem::Update(ctx, update);
@@ -3826,4 +3851,43 @@ float CWeapon::LinePointDistanceSqr(const Line& line, const Vec3& point, float z
 	x2.z*=zScale;
 
 	return ((x2-x1).Cross(x1-x0)).GetLengthSquared()/(x2-x1).GetLengthSquared();
+}
+
+// ===================================================================================
+// Server
+void CWeapon::Sv_CheckRapidFire()
+{
+	CActor* pActor = GetOwnerActor();
+	if (pActor && pActor->m_rapidFire > 0)
+	{
+		//gServer->Log("FIRE STARTE!!!!");
+		if (m_fm)
+		{
+			if (CSingle* pSingleFM = static_cast<CSingle*> (m_fm))
+			{
+				pSingleFM->m_sv_rfSeq = 1; // reset seq
+			}
+		}
+	}
+
+	//gServer->Log("PLANTING == > %s", (sv_is_rmi_planting ? "false" : "true"));
+	sv_is_rmi_planting = !sv_is_rmi_planting;
+	sv_is_rmi_firing = true;
+}
+
+// Server
+bool CWeapon::Sv_IsRapidFiring()
+{
+	CActor* pActor = GetOwnerActor();
+	if (pActor)// && pActor->m_rapidFire > 0)
+	{
+		if (m_fm)
+		{
+			if (CSingle* pSingleFM = static_cast<CSingle*> (m_fm))
+			{
+				return pSingleFM->m_sv_rf_active;
+			}
+		}
+	}
+	return false;
 }

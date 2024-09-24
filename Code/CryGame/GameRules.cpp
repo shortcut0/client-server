@@ -227,7 +227,8 @@ void CGameRules::PostInit(IGameObject* pGameObject)
 		gClient->GetScriptCallbacks()->OnGameRulesCreated(GetEntityId());
 
 	// Server
-	if (gServer) {
+	if (gServer) 
+	{
 		gServer->OnGameStart(pGameObject);
 		gServer->GetEvents()->OnGameRulesCreated(GetEntityId());
 	}
@@ -410,10 +411,10 @@ void CGameRules::ProcessEvent(SEntityEvent& event)
 		ResetFrozen();
 
 		// Server
-		if (g_pServerCVars->server_use_explosion_queue > 0) {
+		//if (g_pServerCVars->server_use_explosion_queue > 0) {
 			while (!m_queuedExplosions.empty())
 				m_queuedExplosions.pop();
-		}
+		//}
 
 		
 		// Server
@@ -1191,6 +1192,9 @@ void CGameRules::MovePlayer(CActor* pActor, const Vec3& pos, const Ang3& angles)
 	CActor::MoveParams params(pos, Quat(angles));
 	pActor->GetGameObject()->InvokeRMI(CActor::ClMoveTo(), params, eRMI_ToClientChannel | eRMI_NoLocalCalls, pActor->GetChannelId());
 	pActor->GetEntity()->SetWorldTM(Matrix34::Create(Vec3(1, 1, 1), params.rot, params.pos));
+
+	// Server (Debug)
+	gServer->Log("[c++] MovePlayer(%s) to x=%fy=%f,z=%f", pActor->GetEntity()->GetName(),pos.x,pos.y,pos.z);
 
 	// Server (AC)
 	if (IScriptTable* pActorScript = pActor->GetEntity()->GetScriptTable())
@@ -3161,6 +3165,8 @@ bool CGameRules::OnCollision(const SGameCollision& event)
 		return true;
 
 	//Prevent squad-mates being hit by bullets/collision damage from object held by the player
+	// Server (Commented)
+	/*
 	if (!gEnv->bMultiplayer)
 	{
 		IEntity* pTarget = event.pCollision->iForeignData[1] == PHYS_FOREIGN_ID_ENTITY ? (IEntity*)event.pCollision->pForeignData[1] : 0;
@@ -3177,11 +3183,72 @@ bool CGameRules::OnCollision(const SGameCollision& event)
 					return false;
 			}
 		}
+	}*/
+
+	// ====================================================================================
+	// Sever
+
+	bool want_report = false;
+	EntityId pTargetId = (event.pTrgEntity ? event.pTrgEntity->GetId() : 0);
+	IEntity* pTarget = event.pTrgEntity;
+	IEntity* pSource = event.pSrcEntity;
+
+	if (pSource)
+	{
+		if (IScriptTable* pSourceScript = pSource->GetScriptTable())
+		{
+			if (pSourceScript->GetValue("SvReportCollisions", want_report) && want_report)
+			{
+
+				SmartScriptTable pCollisionInfo(gEnv->pScriptSystem);
+				pCollisionInfo->SetValue("normal", event.pCollision->n);
+				pCollisionInfo->SetValue("pos", event.pCollision->pt);
+				pCollisionInfo->SetValue("impulse", event.pCollision->normImpulse);
+				pCollisionInfo->SetValue("penetration", event.pCollision->penetration);
+				pCollisionInfo->SetValue("radius", event.pCollision->radius);
+
+				if (pTarget)
+				{
+					if (pTarget->GetPhysics())
+					{
+						pCollisionInfo->SetValue("target_type", (int)pTarget->GetPhysics()->GetType());
+					}
+				}
+				else
+				{
+					pCollisionInfo->SetValue("target_type", 0);
+				}
+
+				Vec3 dir(0, 0, 0);
+				if (event.pCollision->vloc[0].GetLengthSquared() > 1e-6f)
+				{
+					dir = (event.pCollision->vloc[0].GetNormalized());
+					pCollisionInfo->SetValue("dir", dir);
+				}
+
+				gServer->GetEvents()->Call("ServerRPC.Callbacks.OnEntityCollision", ScriptHandle(pSource->GetId()), pSourceScript, pTargetId ? ScriptHandle(pTargetId) : 0, *pCollisionInfo);
+			}
+		}
 	}
+
+	/*
+	if (IEntity* pTarget = event.pTrgEntity)
+	{
+		if (IScriptTable* pTargetScript = pTarget->GetScriptTable())
+		{
+			if (pSourceScript->GetValue("SvReportCollisions", want_report) && want_report)
+			{
+
+			}
+		}
+	}*/
+	// ====================================================================================
+
 
 	// collisions with very low resulting impulse are ignored
 	if (event.pCollision->normImpulse <= 0.001f)
 		return true;
+
 
 	static IEntityClass* s_pBasicEntityClass = m_pEntitySystem->GetClassRegistry()->FindClass("BasicEntity");
 	static IEntityClass* s_pDefaultClass = m_pEntitySystem->GetClassRegistry()->FindClass("Default");
@@ -3666,10 +3733,10 @@ void CGameRules::ResetEntities()
 	ResetFrozen();
 
 	// Server
-	if (g_pServerCVars->server_use_explosion_queue > 0) {
+	//if (g_pServerCVars->server_use_explosion_queue > 0) {
 		while (!m_queuedExplosions.empty())
 			m_queuedExplosions.pop();
-	}
+	//}
 
 
 	// Server
@@ -3823,9 +3890,14 @@ void CGameRules::ScheduleEntityRespawn(EntityId entityId, bool unique, float tim
 
 	SEntityRespawn respawn;
 	respawn.timer = timer;
+	respawn.time = timer;
 	respawn.unique = unique;
 
 	m_respawns.insert(TEntityRespawnMap::value_type(entityId, respawn));
+	if (!HasEntityRespawnData(entityId)) {
+		CreateEntityRespawnData(entityId);
+		//gServer->Log("NONE!");
+	}
 }
 
 //------------------------------------------------------------------------
@@ -3834,6 +3906,11 @@ void CGameRules::UpdateEntitySchedules(float frameTime)
 	if (!gEnv->bServer || m_pGameFramework->IsEditing())
 		return;
 
+
+	// ==============================================================================================
+	std::map<EntityId, std::pair<float, bool>> fixedRespawns;
+
+	// ----
 	TEntityRespawnMap::iterator next;
 	for (TEntityRespawnMap::iterator it = m_respawns.begin(); it != m_respawns.end(); it = next)
 	{
@@ -3845,10 +3922,14 @@ void CGameRules::UpdateEntitySchedules(float frameTime)
 		{
 			IEntity* pEntity = m_pEntitySystem->GetEntity(id);
 			if (pEntity)
+			{
 				continue;
+			}
 		}
 
-		respawn.timer -= frameTime;
+		respawn.timer -= frameTime;// *10000;
+		//gServer->Log("respwning in %f", respawn.timer);
+
 		if (respawn.timer <= 0.0f)
 		{
 			TEntityRespawnDataMap::iterator dit = m_respawndata.find(id);
@@ -3860,7 +3941,6 @@ void CGameRules::UpdateEntitySchedules(float frameTime)
 			}
 
 			SEntityRespawnData& data = dit->second;
-
 			SEntitySpawnParams params;
 			params.pClass = data.pClass;
 			params.qRotation = data.rotation;
@@ -3875,7 +3955,29 @@ void CGameRules::UpdateEntitySchedules(float frameTime)
 #else
 			name = data.pClass->GetName();
 #endif
+
 			params.sName = name.c_str();
+
+			// ============================================================
+			// Server
+			bool eraseData = true;
+			bool uniqueRespawn = true;
+
+			if (data.properties.GetPtr())
+			{
+				const char* fixed_name = "";
+				if (data.properties->GetValue("sRespawnName", fixed_name))
+				{
+					params.sName = fixed_name;
+				}
+
+				if (data.properties->GetValue("bUniqueRespawn", uniqueRespawn))
+				{
+				}
+			}
+
+			//gServer->Log("Entity %s respawning (with name %s)", name.c_str(), params.sName);
+			// ============================================================
 
 			IEntity* pEntity = m_pEntitySystem->SpawnEntity(params, false);
 			if (pEntity && data.properties.GetPtr())
@@ -3890,10 +3992,72 @@ void CGameRules::UpdateEntitySchedules(float frameTime)
 			}
 
 			m_pEntitySystem->InitEntity(pEntity, params);
-			m_respawns.erase(it);
-			m_respawndata.erase(dit);
+
+			// ========================================
+			// we now delete old entries and make new data for respawned ones!
+
+			if (eraseData)
+			{
+				m_respawns.erase(it);
+				m_respawndata.erase(dit);
+			}
+			if (!uniqueRespawn)
+			{
+				fixedRespawns.emplace(pEntity->GetId(), std::make_pair(respawn.time, respawn.unique));
+				//gServer->Log("Adding new respawn..!");
+			}
+
+			/*
+			if (eraseData)
+			{
+				m_respawns.erase(it);
+				m_respawndata.erase(dit);
+			}
+			else
+			{
+				// Reschedule respawn..
+				// respawn.timer = respawn.time;
+			}*/
 		}
 	}
+
+
+	if (!fixedRespawns.empty())
+	{
+		for (auto it = fixedRespawns.begin(); it != fixedRespawns.end(); ++it) {
+			EntityId id = it->first;
+			float time = it->second.first;
+			bool unique = it->second.second;
+
+			// Delete Respawn
+			auto itr = m_respawns.find(id);
+			if (itr != m_respawns.end())
+			{
+				m_respawns.erase(itr);
+			}
+
+			// Delete Data
+			auto itd = m_respawndata.find(id);
+			if (itd != m_respawndata.end())
+			{
+				m_respawndata.erase(itd);
+			}
+
+			// Create a new Respawn
+			ScheduleEntityRespawn(id, unique, time);
+			if (!HasEntityRespawnData(id))
+			{
+				CreateEntityRespawnData(id);
+			}
+
+			//gServer->Log("Fixed respawn data for %x!!", id);
+		}
+	}
+
+
+
+
+	// ==============================================================================================
 
 	TEntityRemovalMap::iterator rnext;
 	for (TEntityRemovalMap::iterator it = m_removals.begin(); it != m_removals.end(); it = rnext)
@@ -3908,6 +4072,7 @@ void CGameRules::UpdateEntitySchedules(float frameTime)
 			m_removals.erase(it);
 			continue;
 		}
+		
 
 		if (removal.visibility)
 		{
@@ -3987,7 +4152,7 @@ void CGameRules::ScheduleEntityRemoval(EntityId entityId, float timer, bool visi
 		return;
 
 	SEntityRemovalData removal;
-	removal.time = timer;
+	removal.time = timer; // for keeping respawn data alive!
 	removal.timer = timer;
 	removal.visibility = visibility;
 

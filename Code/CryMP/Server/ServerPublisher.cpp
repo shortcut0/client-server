@@ -208,9 +208,9 @@ std::string ServerPublisher::GetServerDescription() {
 
 	std::string description = "ATOM Configuration failed to load";
 
-	if (SmartScriptTable pATOMLua = gServer->GetATOMLua()) {
+	//if (SmartScriptTable pATOMLua = gServer->GetATOMLua()) {
 		// Implementation missing
-	}
+	//}
 
 	return description;
 }

@@ -2155,8 +2155,9 @@ int COffHand::CanPerformPickUp(CActor* pActor, IPhysicalEntity* pPhysicalEntity 
 				{
 					//If it's not pickable, ignore helper
 					int pickable = 0;
-					if (props->GetValue("bPickable", pickable) && !pickable)
+					if (props->GetValue("bPickable", pickable) && !pickable) {
 						return OH_NO_GRAB;
+					}
 				}
 				return OH_GRAB_OBJECT;
 			}
@@ -2182,6 +2183,7 @@ int COffHand::CanPerformPickUp(CActor* pActor, IPhysicalEntity* pPhysicalEntity 
 			if (pPhysicalEntity->GetType() == PE_RIGID && !strcmp(pEntity->GetClass()->GetName(), "rock"))
 			{
 				m_grabType = GRAB_TYPE_ONE_HANDED;
+				CryLogAlways("pick non rocks...");
 				return OH_GRAB_OBJECT;
 			}
 
@@ -2192,11 +2194,13 @@ int COffHand::CanPerformPickUp(CActor* pActor, IPhysicalEntity* pPhysicalEntity 
 			{
 				int pickable = 0;
 				int usable = 0;
-				if (props->GetValue("bPickable", pickable) && !pickable) 
+				if (props->GetValue("bPickable", pickable) && !pickable) {
 					return false;
+				}
 				else if (pickable)
-					if (props->GetValue("bUsable", usable) && !usable)
+					if (props->GetValue("bUsable", usable) && !usable) {
 						return OH_GRAB_OBJECT;
+					}
 
 				return false;
 			}

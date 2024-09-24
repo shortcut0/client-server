@@ -48,6 +48,7 @@ public:
 
 	// --------------------------------------------------------------
 	// Server
+	bool m_sv_exploded = false;
 	virtual void SetOwnerId(EntityId newOwnerId);
 
 	// IGameObjectExtension

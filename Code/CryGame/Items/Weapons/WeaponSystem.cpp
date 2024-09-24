@@ -308,7 +308,10 @@ CProjectile *CWeaponSystem::SpawnAmmo(IEntityClass* pAmmoType, bool isRemote, En
 	if ( pAmmoParams->serverSpawn && (!isServer || IsDemoPlayback()) )
 	{
 		if (!pAmmoParams->predictSpawn || isRemote)
+		{
+			gServer->Log("something went wrong! serverSpawn=%s, !predictSpawn=%s || isRemote=%s", pAmmoParams->serverSpawn?"true":"false", pAmmoParams->predictSpawn?"true":"false", isRemote ? "true" : "false");
 			return 0;
+		}
 	}
 
 	m_lastHostId = hostId;
@@ -316,6 +319,8 @@ CProjectile *CWeaponSystem::SpawnAmmo(IEntityClass* pAmmoType, bool isRemote, En
 	SEntitySpawnParams spawnParams;
 	spawnParams.pClass = pAmmoType;
 
+
+	// FIXME!!
 	std::string ammoName = "ammo_" + std::string(pAmmoType->GetName()) +"_" + std::to_string(gServer->GetCounter());
 
 	spawnParams.sName = ammoName.c_str();

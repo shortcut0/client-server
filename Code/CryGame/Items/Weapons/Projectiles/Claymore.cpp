@@ -43,7 +43,7 @@ CClaymore::~CClaymore()
 		IActor* pOwner = g_pGame->GetIGameFramework()->GetIActorSystem()->GetActor(m_ownerId);
 		if (pOwner && pOwner->IsPlayer())
 		{
-			((CPlayer*)pOwner)->RecordExplosiveDestroyed(GetEntityId(), 0);
+			((CPlayer*)pOwner)->RecordExplosiveDestroyed(GetEntityId(), 0, m_sv_exploded);
 		}
 	}
 

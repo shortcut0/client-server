@@ -1009,6 +1009,10 @@ public:
 	{
 		bool							unique;
 		float							timer;
+
+		// =================================================
+		// Server (Allow entities to respawn more than once)
+		float	                        time;
 	};
 
 	struct SEntityRemovalData

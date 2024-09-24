@@ -44,6 +44,30 @@ public:
 	int SetProjectileVelocitySpeedScale(IFunctionHandler* pH, float scale); // such long name..
 
 	int Sv_Melee(IFunctionHandler* pH);
+	int Sv_SetFiringInfo(IFunctionHandler* pH);
+	int Sv_RequestStartFire(IFunctionHandler* pH);
+	int Sv_RequestStopFire(IFunctionHandler* pH);
+	int Sv_ResetFiringInfo(IFunctionHandler* pH);
+	int Sv_GetFireModeName(IFunctionHandler* pH);
+	int Sv_IsFiring(IFunctionHandler* pH);
+	int Sv_Update(IFunctionHandler* pH);
+	int Sv_UpdateFM(IFunctionHandler* pH);
+	int Sv_SetOwnerID(IFunctionHandler* pH, ScriptHandle ownerId);
+	
+
+	int Sv_SetRMIPlanting(IFunctionHandler* pH, bool mode);
+	int Sv_SetPseudoOwnerId(IFunctionHandler* pH, ScriptHandle id);
+
+	// ===========================================================================
+	// Gun Turret
+	int Sv_StartFireGunTurret(IFunctionHandler* pH, bool mode);
+	int Sv_StopFireGunTurret(IFunctionHandler* pH, bool mode);
+	int Sv_GunTurretTargetEntity(IFunctionHandler* pH, ScriptHandle id, float sec);
+	int Sv_ResetGunTurret(IFunctionHandler* pH);
+	int Sv_ResetGunTurretAll(IFunctionHandler* pH);
+	int Sv_GunTurretResetLookAt(IFunctionHandler* pH);
+	int Sv_GunTurretSetLookAt(IFunctionHandler* pH, float z, float x);
+	int Sv_GunTurretEnableServerFiring(IFunctionHandler* pH, bool enable);
 
 	// ...
 

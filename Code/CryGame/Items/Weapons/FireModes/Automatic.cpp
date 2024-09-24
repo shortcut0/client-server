@@ -14,6 +14,9 @@ History:
 #include "Automatic.h"
 #include "CryGame/Actors/Actor.h"
 
+// Server
+#include "CryMP/Server/Server.h" // <== in single.cpp now
+
 
 //------------------------------------------------------------------------
 CAutomatic::CAutomatic()
@@ -38,8 +41,24 @@ void CAutomatic::Update(float frameTime, unsigned int frameId)
 {
 	CSingle::Update(frameTime, frameId);
 
-	if (m_firing && CanFire(false))
+	// =======================================================
+	// Server
+	//gServer->Log("hello?");
+	/*if (m_pWeapon->Sv_IsFiring) {
+		float curr_time = gEnv->pTimer->GetCurrTime();
+		//gServer->Log("Firing automatic: next in %f", m_sv_nextShotTime-curr_time);
+		if (curr_time >= m_sv_nextShotTime) {
+			gServer->Log("fired!");
+			Shoot(true, false);
+			m_sv_nextShotTime = curr_time + (m_next_shot_dt * 1.5);
+		}
+	} */
+
+	// ...
+	/*else*/ if (m_firing && CanFire(false))
+	{
 		m_firing = Shoot(true);
+	}
 }
 
 //------------------------------------------------------------------------

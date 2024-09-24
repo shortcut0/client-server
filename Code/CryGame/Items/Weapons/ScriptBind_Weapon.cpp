@@ -17,6 +17,9 @@
 #include "CryCommon/CryAction/IGameObject.h"
 #include "CryGame/Actors/Actor.h"
 
+// Server
+#include "CryGame/Items/Weapons/GunTurret.h"
+
 
 #define REUSE_VECTOR(table, name, value)	\
 	{ if (table->GetValueType(name) != svtObject) \
@@ -619,8 +622,418 @@ void CScriptBind_Weapon::RegisterMethods()
 	SCRIPT_REG_FUNC(GetAttachedAccessories);
 	SCRIPT_REG_TEMPLFUNC(SetProjectileVelocitySpeedScale, "scale"); // such long name..
 
+	SCRIPT_REG_TEMPLFUNC(Sv_SetOwnerID, "id")
+	SCRIPT_REG_TEMPLFUNC(Sv_SetFiringInfo,"");
+	SCRIPT_REG_TEMPLFUNC(Sv_RequestStartFire,"");
+	SCRIPT_REG_TEMPLFUNC(Sv_SetRMIPlanting, "mode");
+	SCRIPT_REG_TEMPLFUNC(Sv_SetPseudoOwnerId, "id");
+	SCRIPT_REG_TEMPLFUNC(Sv_StopFireGunTurret, "sec");
+	SCRIPT_REG_TEMPLFUNC(Sv_StartFireGunTurret, "sec");
+	SCRIPT_REG_TEMPLFUNC(Sv_GunTurretTargetEntity, "id, sec");
+	SCRIPT_REG_TEMPLFUNC(Sv_GunTurretSetLookAt, "z, x");
+	SCRIPT_REG_TEMPLFUNC(Sv_GunTurretEnableServerFiring, "enable");
+	SCRIPT_REG_FUNC(Sv_GunTurretResetLookAt);
+
 	SCRIPT_REG_FUNC(Sv_Melee);
+	SCRIPT_REG_FUNC(Sv_IsFiring);
+	SCRIPT_REG_FUNC(Sv_RequestStopFire);
+	SCRIPT_REG_FUNC(Sv_ResetFiringInfo);
+	SCRIPT_REG_FUNC(Sv_GetFireModeName);
+	SCRIPT_REG_FUNC(Sv_Update);
+	SCRIPT_REG_FUNC(Sv_UpdateFM);
+	SCRIPT_REG_FUNC(Sv_ResetGunTurret);		// reset only script data
+	SCRIPT_REG_FUNC(Sv_ResetGunTurretAll);	// reset everything
 }
+
+//------------------------------------------------------------------------
+// Server
+int CScriptBind_Weapon::Sv_SetPseudoOwnerId(IFunctionHandler* pH, ScriptHandle id)
+{
+	CWeapon* pWeapon = GetWeapon(pH);
+	if (!pWeapon)
+		return pH->EndFunction();
+
+	EntityId entityId;
+	entityId = id.n;
+
+	if (!entityId)
+	{
+	//	return pH->EndFunction(); // allow null
+	}
+
+	pWeapon->Sv_SetPseudoOwnerId(entityId);
+	return pH->EndFunction();
+}
+
+//------------------------------------------------------------------------
+// Server
+int CScriptBind_Weapon::Sv_SetRMIPlanting(IFunctionHandler* pH, bool mode)
+{
+	CWeapon* pWeapon = GetWeapon(pH);
+	if (!pWeapon)
+		return pH->EndFunction();
+
+	pWeapon->sv_is_rmi_planting = mode;
+	return pH->EndFunction();
+}
+
+//------------------------------------------------------------------------
+// Server
+int CScriptBind_Weapon::Sv_StopFireGunTurret(IFunctionHandler* pH, bool sec)
+{
+	CWeapon* pWeapon = GetWeapon(pH);
+	if (!pWeapon)
+		return pH->EndFunction();
+
+	if (CGunTurret* pGT = static_cast<CGunTurret*>(pWeapon))
+	{
+		CryLogAlways("updated...");
+		pGT->Sv_StopFire(sec);
+	}
+
+	return pH->EndFunction();
+}
+
+//------------------------------------------------------------------------
+// Server
+int CScriptBind_Weapon::Sv_GunTurretEnableServerFiring(IFunctionHandler* pH, bool enable)
+{
+	CWeapon* pWeapon = GetWeapon(pH);
+	if (!pWeapon)
+		return pH->EndFunction();
+
+	if (CGunTurret* pGT = static_cast<CGunTurret*>(pWeapon))
+	{
+		pGT->Sv_SetServerFiring(enable);
+	}
+
+	return pH->EndFunction();
+}
+
+//------------------------------------------------------------------------
+// Server
+int CScriptBind_Weapon::Sv_GunTurretSetLookAt(IFunctionHandler* pH, float z, float x)
+{
+	CWeapon* pWeapon = GetWeapon(pH);
+	if (!pWeapon)
+		return pH->EndFunction();
+
+	if (CGunTurret* pGT = static_cast<CGunTurret*>(pWeapon))
+	{
+		pGT->Sv_SetLookAt(z, x);
+	}
+
+	return pH->EndFunction();
+}
+
+//------------------------------------------------------------------------
+// Server
+int CScriptBind_Weapon::Sv_GunTurretResetLookAt(IFunctionHandler* pH)
+{
+	CWeapon* pWeapon = GetWeapon(pH);
+	if (!pWeapon)
+		return pH->EndFunction();
+
+	if (CGunTurret* pGT = static_cast<CGunTurret*>(pWeapon))
+	{
+		pGT->Sv_ResetLookAt();
+	}
+
+	return pH->EndFunction();
+}
+
+//------------------------------------------------------------------------
+// Server
+int CScriptBind_Weapon::Sv_StartFireGunTurret(IFunctionHandler* pH, bool sec)
+{
+	CWeapon* pWeapon = GetWeapon(pH);
+	if (!pWeapon)
+		return pH->EndFunction();
+
+	if (CGunTurret* pGT = static_cast<CGunTurret*>(pWeapon))
+	{
+		CryLogAlways("updated...");
+		pGT->Sv_StartFire(sec);
+	}
+
+	return pH->EndFunction();
+}
+
+
+//------------------------------------------------------------------------
+// Server
+int CScriptBind_Weapon::Sv_GunTurretTargetEntity(IFunctionHandler* pH, ScriptHandle id, float sec)
+{
+	CWeapon* pWeapon = GetWeapon(pH);
+	if (!pWeapon)
+		return pH->EndFunction();
+
+	EntityId entityId;
+	entityId = id.n;
+
+	if (CGunTurret* pGT = static_cast<CGunTurret*>(pWeapon))
+	{
+		CryLogAlways("updated...");
+		pGT->Sv_SetTarget(entityId, sec);
+	}
+
+	return pH->EndFunction();
+}
+
+//------------------------------------------------------------------------
+// Server
+int CScriptBind_Weapon::Sv_ResetGunTurret(IFunctionHandler* pH)
+{
+	CWeapon* pWeapon = GetWeapon(pH);
+	if (!pWeapon)
+		return pH->EndFunction();
+
+	if (CGunTurret* pGT = static_cast<CGunTurret*>(pWeapon))
+	{
+		CryLogAlways("updated...");
+		pGT->Sv_OnReset();
+	}
+
+	return pH->EndFunction();
+}
+
+//------------------------------------------------------------------------
+// Server
+int CScriptBind_Weapon::Sv_ResetGunTurretAll(IFunctionHandler* pH)
+{
+	CWeapon* pWeapon = GetWeapon(pH);
+	if (!pWeapon)
+		return pH->EndFunction();
+
+	if (CGunTurret* pGT = static_cast<CGunTurret*>(pWeapon))
+	{
+		pGT->OnReset();
+	}
+
+	return pH->EndFunction();
+}
+
+//------------------------------------------------------------------------
+// Server
+int CScriptBind_Weapon::Sv_UpdateFM(IFunctionHandler* pH)
+{
+	CWeapon* pWeapon = GetWeapon(pH);
+	if (!pWeapon)
+		return pH->EndFunction();
+
+	if (IFireMode* pFM = pWeapon->GetActiveFireMode())
+	{
+		pFM->Update(gEnv->pTimer->GetFrameTime(), gEnv->pRenderer->GetFrameID());
+	}
+
+	return pH->EndFunction();
+}
+
+//------------------------------------------------------------------------
+// Server
+int CScriptBind_Weapon::Sv_Update(IFunctionHandler* pH)
+{
+	CWeapon* pWeapon = GetWeapon(pH);
+	if (!pWeapon)
+		return pH->EndFunction();
+
+	
+	SEntityUpdateContext ctx;
+	ctx.fFrameTime = gEnv->pTimer->GetFrameTime();
+	ctx.nFrameID = gEnv->pRenderer->GetFrameID();
+	pWeapon->Update(ctx, eIUS_FireMode);
+	
+	//pWeapon->RequireUpdate(eIUS_FireMode);
+
+	return pH->EndFunction();
+}
+
+//------------------------------------------------------------------------
+// Server
+int CScriptBind_Weapon::Sv_SetOwnerID(IFunctionHandler* pH, ScriptHandle ownerId)
+{
+	CWeapon* pWeapon = GetWeapon(pH);
+	if (!pWeapon)
+		return pH->EndFunction();
+
+	EntityId pOwnerID = ownerId.n;
+	pWeapon->SetOwnerId(pOwnerID);
+
+	return pH->EndFunction();
+}
+
+//------------------------------------------------------------------------
+// Server
+int CScriptBind_Weapon::Sv_RequestStopFire(IFunctionHandler* pH)
+{
+	CWeapon* pWeapon = GetWeapon(pH);
+	if (!pWeapon)
+		return pH->EndFunction();
+
+	//CActor* pActor = pWeapon->GetOwnerActor();
+//	if (!pActor)
+	//	return pH->EndFunction();
+
+	//Vec3 pos = pWeapon->GetEntity()->GetWorldPos();
+	//Vec3 dir = pWeapon->GetEntity()->GetWorldRotation().GetRow0();
+
+
+	pWeapon->Sv_IsFiring = false;
+	Sv_ResetFiringInfo(pH);
+
+	pWeapon->NetStopFire();
+	pWeapon->SvRequestStopFire();
+	pWeapon->RequestStopFire();
+	
+	return pH->EndFunction();
+}
+
+
+//------------------------------------------------------------------------
+// Server
+int CScriptBind_Weapon::Sv_GetFireModeName(IFunctionHandler* pH)
+{
+
+	CWeapon* pWeapon = GetWeapon(pH);
+	if (!pWeapon)
+		return pH->EndFunction();
+
+	if (IFireMode* pFM = pWeapon->GetActiveFireMode())
+	{
+		return pH->EndFunction(pFM->GetName());
+	}
+
+	return pH->EndFunction();
+}
+
+
+//------------------------------------------------------------------------
+// Server
+int CScriptBind_Weapon::Sv_IsFiring(IFunctionHandler* pH)
+{
+
+	CWeapon* pWeapon = GetWeapon(pH);
+	if (!pWeapon)
+		return pH->EndFunction();
+
+	return pH->EndFunction(pWeapon->Sv_IsFiring);
+}
+
+
+
+//------------------------------------------------------------------------
+// Server
+int CScriptBind_Weapon::Sv_ResetFiringInfo(IFunctionHandler* pH)
+{
+
+	CWeapon* pWeapon = GetWeapon(pH);
+	if (!pWeapon)
+		return pH->EndFunction();
+
+	pWeapon->Sv_FireDir.Set(0, 0, 0);
+	pWeapon->Sv_FirePos.Set(0, 0, 0);
+	pWeapon->Sv_FireHit.Set(0, 0, 0);
+	pWeapon->Sv_FireRate = -1.f;
+
+	return pH->EndFunction();
+}
+
+
+//------------------------------------------------------------------------
+// Server
+int CScriptBind_Weapon::Sv_SetFiringInfo(IFunctionHandler* pH)
+{
+
+	CWeapon* pWeapon = GetWeapon(pH);
+	if (!pWeapon)
+		return pH->EndFunction();
+
+	//if (!pWeapon->Sv_IsFiring)
+	//	return pH->EndFunction();
+
+	Vec3 dir(0, 0, 0);
+	Vec3 pos(0, 0, 0);
+	Vec3 hit(0, 0, 0);
+
+	if (pH->GetParamCount() >= 1)
+		if (pH->GetParam(1, dir) && dir.GetLength() > 0)
+			pWeapon->Sv_FireDir = dir;
+
+	if (pH->GetParamCount() >= 2)
+		if (pH->GetParam(2, pos) && pos.GetLength() > 0)
+			pWeapon->Sv_FirePos = pos;
+
+	if (pH->GetParamCount() >= 3)
+		if (pH->GetParam(3, hit) && hit.GetLength() > 0)
+			pWeapon->Sv_FireHit = hit;
+
+	float rate = -1;
+	if (pH->GetParamCount() >= 4)
+	{
+		if (pH->GetParam(4, rate))
+		{
+			//CryLogAlways("hello, set to %f", rate);
+			pWeapon->Sv_FireRate = rate;
+		}
+	}
+
+	//CryLogAlways("rate= %f", pWeapon->Sv_FireRate);
+
+
+	//CryLogAlways("Provided Dir: X=%f,y=%f,z=%f", dir.x, dir.y, dir.z);
+	//CryLogAlways("Provided Pos: X=%f,y=%f,z=%f", pos.x, pos.y, pos.z);
+	//CryLogAlways("Provided Hit: X=%f,y=%f,z=%f", hit.x, hit.y, hit.z);
+
+	return pH->EndFunction();
+}
+
+
+//------------------------------------------------------------------------
+// Server
+int CScriptBind_Weapon::Sv_RequestStartFire(IFunctionHandler* pH)
+{
+	CWeapon* pWeapon = GetWeapon(pH);
+	if (!pWeapon)
+		return pH->EndFunction();
+
+	//CActor* pActor = pWeapon->GetOwnerActor();
+//	if (!pActor)
+	//	return pH->EndFunction();
+
+	//Vec3 pos = pWeapon->GetEntity()->GetWorldPos();
+	//Vec3 dir = pWeapon->GetEntity()->GetWorldRotation().GetRow0();
+
+	pWeapon->Sv_IsFiring = true;
+	if (IFireMode* pFM = pWeapon->GetActiveFireMode())
+	{
+	}
+
+	Sv_ResetFiringInfo(pH);
+	Sv_SetFiringInfo(pH);
+
+	IEntityClass* pAmmoType = gEnv->pEntitySystem->GetClassRegistry()->FindClass("bullet");
+	Vec3 pos = pWeapon->Sv_FirePos;
+	Vec3 dir = pWeapon->Sv_FireDir;
+	Vec3 vel = pWeapon->Sv_FireDir;
+	Vec3 hit = pWeapon->Sv_FireHit;
+
+	//pWeapon->RequestShoot(pAmmoType, pos, dir, vel, hit, 0, 0, pWeapon->GetShootSeqN(), 0, false);
+	pWeapon->StartFire();
+	pWeapon->NetStartFire();
+	pWeapon->SvRequestStartFire();
+	pWeapon->RequestStartFire();
+	
+	//if (IFireMode* pFM = pWeapon->GetActiveFireMode())
+		//if (strcmp(pFM->GetName(), "single") == 0) {
+
+		//	CryLogAlways("hot single in my area detected");
+		//}
+
+	//CryLogAlways("%s", pWeapon->GetActiveFireMode()->GetName());
+
+	return pH->EndFunction();
+}
+
 
 //------------------------------------------------------------------------
 // Server

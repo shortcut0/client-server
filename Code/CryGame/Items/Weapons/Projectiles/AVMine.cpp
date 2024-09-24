@@ -39,7 +39,7 @@ CAVMine::~CAVMine()
 		IActor* pOwner = g_pGame->GetIGameFramework()->GetIActorSystem()->GetActor(m_ownerId);
 		if (pOwner && pOwner->IsPlayer())
 		{
-			((CPlayer*)pOwner)->RecordExplosiveDestroyed(GetEntityId(), 1);
+			((CPlayer*)pOwner)->RecordExplosiveDestroyed(GetEntityId(), 1, m_sv_exploded);
 		}
 	}
 
@@ -156,7 +156,15 @@ void CAVMine::ProcessEvent(SEntityEvent& event)
 							m_currentWeight += physStatus.mass;
 
 						if (m_currentWeight > m_triggerWeight)
+						{
 							Explode(true);
+						}
+						else
+						{
+							// TODO:
+							// if standing on it too long..
+							//Explode(true);
+						}
 					}
 				}
 			}

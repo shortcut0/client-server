@@ -178,6 +178,10 @@ void ServerEvents::OnStartReload(IWeapon* pWeapon, EntityId shooterId, IEntityCl
 
 
 void ServerEvents::OnEndReload(IWeapon* pWeapon, EntityId shooterId, IEntityClass* pAmmoType) {
+	if (CWeapon* pWpn = static_cast<CWeapon*>(pWeapon)) {
+		EntityId weaponId = pWpn->GetEntityId();
+		Call("ServerRPC.Callbacks.OnEndReload", ScriptHandle(shooterId), ScriptHandle(weaponId));
+	}
 
 }
 

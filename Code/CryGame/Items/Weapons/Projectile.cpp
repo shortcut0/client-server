@@ -854,6 +854,10 @@ void CProjectile::Explode(bool destroy, bool impact, const Vec3& pos, const Vec3
 
 	if (destroy || remove_projectile)
 		Destroy();
+
+
+	// Server
+	m_sv_exploded = true;
 }
 
 void CProjectile::UpdateWhiz()

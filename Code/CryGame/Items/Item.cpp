@@ -1264,11 +1264,11 @@ void CItem::Drop(float impulseScale, bool selectNext, bool byDeath)
 	IEntityClass* pClass = GetEntity()->GetClass();
 	if (pClass && pClass == gEnv->pEntitySystem->GetClassRegistry()->FindClass("LAW")) {
 		if (!m_bRMIDrop && g_pServerCVars->server_autodrop_rpg <= 0) {
-			CryLogAlways("NOT droppppppp ING!");
+			//CryLogAlways("NOT droppppppp ING!");
 			return;
 		}
 
-		CryLogAlways("RPG! m_bRMIDrop=%s g_pServerCVars->server_autodrop_rpg=%d", m_bRMIDrop ? "true" : "false", g_pServerCVars->server_autodrop_rpg);
+		//CryLogAlways("RPG! m_bRMIDrop=%s g_pServerCVars->server_autodrop_rpg=%d", m_bRMIDrop ? "true" : "false", g_pServerCVars->server_autodrop_rpg);
 	}
 
 	bool isDWSlave = IsDualWieldSlave();

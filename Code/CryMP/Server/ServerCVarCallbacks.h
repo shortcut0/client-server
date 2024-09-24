@@ -13,7 +13,7 @@
 void CCALLBACK_MaxPlayers(ICVar* pCVar) {
 	int num = pCVar->GetIVal();
 	if (num > 99)
-		gServer->LogWarning("Max Players >99 won't be displayed correctl.");
+		gServer->LogWarning("Max Players >99 won't be displayed correctly.");
 
 	gServer->UpdateGameSpyServerReport(EGameSpyUpdateType::eGSUpdate_Server, "maxplayers", pCVar->GetString());
 }

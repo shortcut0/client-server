@@ -450,6 +450,7 @@ bool CActor::ShouldUseMPParams()
 //------------------------------------------------------------------------
 void CActor::Revive(ReasonForRevive reason)
 {
+
 	ClearExtensionCache();
 
 	if (reason == ReasonForRevive::FROM_INIT)
@@ -583,8 +584,10 @@ IGrabHandler* CActor::CreateGrabHanlder()
 }
 
 //------------------------------------------------------------------------
+
 void CActor::Physicalize(EStance stance)
 {
+	
 	pe_player_dimensions playerDim;
 	pe_player_dynamics playerDyn;
 	SEntityPhysicalizeParams pp;
@@ -801,15 +804,9 @@ void CActor::Physicalize(EStance stance)
 
 	//the finish physicalization
 	PostPhysicalize();
+	
 }
 
-//
-void CActor::SetActorModel()
-{
-	// this should be pure-virtual, but for the moment to support alien scripts
-	if (IScriptTable* pScriptTable = GetEntity()->GetScriptTable())
-		Script::CallMethod(pScriptTable, "SetActorModel", IsClient());
-}
 
 //------------------------------------------------------------------------
 void CActor::PostPhysicalize()
@@ -838,6 +835,15 @@ void CActor::PostPhysicalize()
 			}
 		}
 	}
+}
+
+
+//
+void CActor::SetActorModel()
+{
+	// this should be pure-virtual, but for the moment to support alien scripts
+	if (IScriptTable* pScriptTable = GetEntity()->GetScriptTable())
+		Script::CallMethod(pScriptTable, "SetActorModel", IsClient());
 }
 
 //------------------------------------------------------------------------
@@ -3600,7 +3606,7 @@ void CActor::SetSleepTimer(float timer)
 IMPLEMENT_RMI(CActor, SvRequestDropItem)
 {
 
-	if (!gServer->GetAC()->CheckOwnerRequest(pNetChannel, GetEntityId(), "RMI Spoof", __FUNCTION__, params.itemId ? ScriptHandle(params.itemId) : 0))
+	if (!gServer->GetAC()->CheckOwnerRequest(pNetChannel, GetEntityId(), "RMI Spoof", __FUNCTION__, false, params.itemId ? ScriptHandle(params.itemId) : 0))
 		return false;
 	// ---------------------------------------
 	// Server
@@ -3621,13 +3627,13 @@ IMPLEMENT_RMI(CActor, SvRequestDropItem)
 		gServer->GetEvents()->Call("ServerRPC.Callbacks.OnCheat", pChannelId, "RMI Spoof (SvRequestDropItem)", ScriptHandle(GetEntityId()), ScriptHandle(params.itemId));
 		return false;
 	}
+	*/
 
 	// Server
 	bool ok = true;
 	if (gServer->GetEvents()->Get("ServerRPC.Callbacks.CanDropWeapon", ok, ScriptHandle(GetEntityId()), ScriptHandle(params.itemId)) && !ok) {
 		return true;
 	}
-	*/
 	// ...
 	// ---------------------------------------
 
@@ -3655,7 +3661,7 @@ IMPLEMENT_RMI(CActor, SvRequestPickUpItem)
 	// ---------------------------------------
 	// Server
 
-	if (!gServer->GetAC()->CheckOwnerRequest(pNetChannel, GetEntityId(), "RMI Spoof", __FUNCTION__, params.itemId ? ScriptHandle(params.itemId) : 0))
+	if (!gServer->GetAC()->CheckOwnerRequest(pNetChannel, GetEntityId(), "RMI Spoof", __FUNCTION__, false, params.itemId ? ScriptHandle(params.itemId) : 0))
 		return false;
 
 	/*
@@ -3690,6 +3696,14 @@ IMPLEMENT_RMI(CActor, SvRequestPickUpItem)
 			{
 				if (IGameObject* pGameObject = m_pGameFramework->GetGameObject(params.itemId))
 				{
+					
+					bool ok = true;
+					if (!gServer->GetEvents()->Get("ServerRPC.Callbacks.CanPickObject", ok, ScriptHandle(GetEntityId()), ScriptHandle(params.itemId)) || !ok) {
+						//GetGameObject()->InvokeRMIWithDependentObject(CActor::ClDrop(), CActor::DropItemParams(params.itemId, 1, true, false), eRMI_ToOwnClient | eRMI_NoLocalCalls, GetChannelId());
+						GetGameObject()->InvokeRMIWithDependentObject(CActor::ClDrop(), CActor::DropItemParams(params.itemId, 1, true, false), eRMI_ToAllClients | eRMI_NoLocalCalls, params.itemId);
+						//                 invokeRMIWithDependentObject(CActor::ClDrop(), CActor::DropItemParams(GetEntityId(), impulseScale, selectNext, byDeath), eRMI_ToAllClients | eRMI_NoLocalCalls, GetEntityId());
+						return true;
+					}
 
 					// Server (Update the "owner" of the item!)
 					IEntity* pHeldObject = gEnv->pEntitySystem->GetEntity(params.itemId);
@@ -3697,13 +3711,6 @@ IMPLEMENT_RMI(CActor, SvRequestPickUpItem)
 						if (IScriptTable* pHeldObjectLua = pHeldObject->GetScriptTable())
 							pHeldObjectLua->SetValue("OwnerID", ScriptHandle(GetEntityId()));
 					// ...
-					
-					bool ok = true;
-					if (!gServer->GetEvents()->Get("ServerRPC.Callbacks.CanPickObject", ok, ScriptHandle(GetEntityId()), ScriptHandle(params.itemId)) || !ok) {
-					//	GetGameObject()->InvokeRMIWithDependentObject(CActor::ClDrop(), CActor::DropItemParams(params.itemId, 1, true, false), eRMI_ToAllClients | eRMI_NoLocalCalls, GetEntityId());
-						//GetGameObject()->InvokeRMIWithDependentObject(CActor::ClDrop(), CActor::PickItemParams(params.itemId, false, false), eRMI_ToAllClients | eRMI_NoLocalCalls, params.itemId);
-						return true;
-					}
 
 					m_pGameFramework->GetNetContext()->DelegateAuthority(params.itemId, pNetChannel);
 					SetHeldObjectId(params.itemId);
@@ -3738,7 +3745,7 @@ IMPLEMENT_RMI(CActor, SvRequestUseItem)
 	// ---------------------------------------
 	// Server
 
-	if (!gServer->GetAC()->CheckOwnerRequest(pNetChannel, GetEntityId(), "RMI Spoof", __FUNCTION__, params.itemId ? ScriptHandle(params.itemId) : 0))
+	if (!gServer->GetAC()->CheckOwnerRequest(pNetChannel, GetEntityId(), "RMI Spoof", __FUNCTION__, false, params.itemId ? ScriptHandle(params.itemId) : 0))
 		return false;
 
 	// ...
