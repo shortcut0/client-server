@@ -49,7 +49,10 @@ public:
 		// try to handle cheater.. if they exist..
 		if (uint16 pChannelId = m_pGameFramework->GetGameChannelId(pNetChannel)) {
 			if (CActor* pNetActor = GetActorByChannel(pChannelId))
-				m_pEvents->Call("ServerRPC.Callbacks.OnCheat", pChannelId, sCheatName, sFunctionPtr, ScriptHandle(pNetActor->GetEntityId()), params...);
+			{
+				EntityId pNetId = pNetActor->GetEntityId();
+				m_pEvents->Call("ServerRPC.Callbacks.OnCheat", pChannelId, sCheatName, sFunctionPtr, ScriptHandle(pNetId), ScriptHandle(pNetId), false, params...);
+			}
 		}
 
 		return false;
@@ -57,7 +60,7 @@ public:
 
 	// -----------------
 	template<class... Params>
-	bool CheckDistance(INetChannel* pNetChannel, const Params &... params) { return Distance(pNetChannel, params...); }
+	bool CheckDistance(INetChannel* pNetChannel, const Params &... params) { return Distance(pNetChannel, params...); } // ?!
 
 	// -----------------
 
@@ -108,6 +111,6 @@ public:
 		if (!m_status) { 
 			return false;  // no longpoke
 		} 
-		return seq == 1; // SEQ == 1 means longpoke
+		return seq == 1; // SEQ == 1 means longpoke ??
 	};
 };
