@@ -338,6 +338,8 @@ void CGameRules::ProcessServerExplosion(const ExplosionInfo& explosionInfo)
 
 	GetGameObject()->InvokeRMI(ClExplosion(), explosionInfo, eRMI_ToRemoteClients);
 	ClientExplosion(explosionInfo);
+
+	gServer->DebugExplosion();
 }
 
 //------------------------------------------------------------------------

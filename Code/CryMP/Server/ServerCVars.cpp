@@ -60,7 +60,7 @@ void ServerCVars::InitCVars(IConsole* pConsole)
 	pConsole->Register("server_turret_debug", &server_turret_debug, 0, 0,						"Enable/Disable the ghost bug fix");
 	pConsole->Register("server_turret_debug_step", &server_turret_debug_step, 0.05, 0,						"Enable/Disable the ghost bug fix");
 	
-	pConsole->Register("server_ghostbug_fix", &server_ghostbug_fix, 1, 0,						"Enable/Disable the ghost bug fix");
+	pConsole->Register("server_ghostbug_fix", &server_ghostbug_fix, 0, 0,						"Enable/Disable the ghost bug fix");
 	pConsole->Register("server_use_hit_queue", &server_use_hit_queue, 0, 0,						"Enable/Disable the hit queue");
 	pConsole->Register("server_use_explosion_queue", &server_use_explosion_queue, 1, 0,			"Enable/Disable the explosion queue");
 	pConsole->Register("server_classic_chat", &server_classic_chat, 0, 0,						"Enable/Disable the default chat system");

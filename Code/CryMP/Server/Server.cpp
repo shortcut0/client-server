@@ -165,6 +165,8 @@ void Server::Init(IGameFramework* pGameFramework)
 
 
 	m_DebugTimer = ServerTimer(0.1f);
+	m_DebugTimer2 = ServerTimer(0.0f);
+
 	m_ScriptSecondTimer = ServerTimer(1.f);
 	m_ScriptMinuteTimer = ServerTimer(60.f);
 	m_ScriptHourTimer = ServerTimer(3600.f);
@@ -197,6 +199,13 @@ void Server::Init(IGameFramework* pGameFramework)
 	// Load Script File
 	RegisterScriptGlobals();
 	LoadScript();
+}
+
+// -------------------------------------
+void Server::DebugExplosion()
+{
+	float diff = m_DebugTimer2.Diff_Refresh();
+	Log("explosion diff: %f", diff);
 }
 
 // -------------------------------------

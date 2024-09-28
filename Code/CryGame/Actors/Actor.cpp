@@ -2400,11 +2400,11 @@ bool CActor::SetAspectProfile(EEntityAspects aspect, uint8 profile)
 	// SERVER
 	if (g_pServerCVars->server_fix_spectatorDesync > 0) {
 		//CryLogAlways("Executing original aspect profiler");
-		return SetAspectProfile_ORIGINAL(aspect, profile);
+		
 	}
-
+	return SetAspectProfile_ORIGINAL(aspect, profile);
 	//CryLogAlways("Executing crymp aspect profiler...");
-	return SetAspectProfile_CryMP(aspect, profile);
+	//return SetAspectProfile_CryMP(aspect, profile);
 
 	
 }

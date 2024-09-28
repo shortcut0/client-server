@@ -912,6 +912,7 @@ public:
 	DECLARE_SERVER_RMI_NOATTACH_FAST(SvRequestSimpleHit, SimpleHitInfo, eNRT_ReliableUnordered);
 	DECLARE_SERVER_RMI_NOATTACH_FAST(SvRequestHit, HitInfo, eNRT_ReliableUnordered);
 	DECLARE_CLIENT_RMI_NOATTACH_FAST(ClExplosion, ExplosionInfo, eNRT_ReliableUnordered);
+
 	DECLARE_CLIENT_RMI_NOATTACH_FAST(ClFreezeEntity, FreezeEntityParams, eNRT_ReliableOrdered);
 	DECLARE_CLIENT_RMI_NOATTACH_FAST(ClShatterEntity, ShatterEntityParams, eNRT_ReliableOrdered);
 
@@ -936,9 +937,9 @@ public:
 	// Server
 	// use ordered flag to ensure messages wont mix up!
 
-	DECLARE_CLIENT_RMI_NOATTACH(ClChatMessage, ChatMessageParams, eNRT_ReliableOrdered); // is this neccesarry?
+	//DECLARE_CLIENT_RMI_NOATTACH(ClChatMessage, ChatMessageParams, eNRT_ReliableOrdered); // is this neccesarry?
 	DECLARE_CLIENT_RMI_NOATTACH(ClTextMessage, TextMessageParams, eNRT_ReliableOrdered);
-	//DECLARE_CLIENT_RMI_NOATTACH(ClChatMessage, ChatMessageParams, eNRT_ReliableUnordered);
+	DECLARE_CLIENT_RMI_NOATTACH(ClChatMessage, ChatMessageParams, eNRT_ReliableUnordered); // keep unordered for these..
 	//DECLARE_CLIENT_RMI_NOATTACH(ClTextMessage, TextMessageParams, eNRT_ReliableUnordered); // old
 
 	//---------------------------------------------------------------------------------------------

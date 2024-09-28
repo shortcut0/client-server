@@ -232,8 +232,12 @@ private:
 	int m_lastChannel = 0;
 
 	// Debug
+	ServerTimer m_DebugTimer2;
 	ServerTimer m_DebugTimer;
 	void Debug();
+
+public:
+	void DebugExplosion();
 };
 
 ///////////////////////

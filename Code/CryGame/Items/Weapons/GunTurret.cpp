@@ -1547,7 +1547,7 @@ void CGunTurret::StopFire(bool sec)
 
 	if (!sec)
 	{
-		if (m_sv_isServerFiring)
+		if (m_sv_isServerFiring || m_sv_useServerFiring)
 		{
 			//gServer->Log("server fire?");
 			if (CWeapon* pWeapon = static_cast<CWeapon*>(this))

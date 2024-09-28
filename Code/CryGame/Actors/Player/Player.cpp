@@ -1408,19 +1408,22 @@ void CPlayer::PrePhysicsUpdate()
 
 	const bool TP(IsThirdPerson());
 
-	if (m_pMovementController && !gEnv->bMultiplayer) //CryMP: Ghost Bug Fix #2, disable this in mp for now
+	if (!gEnv->bServer)
 	{
-		if (g_pGame->GetCVars()->g_enableIdleCheck == 1)
+		if (m_pMovementController && !gEnv->bMultiplayer) //CryMP: Ghost Bug Fix #2, disable this in mp for now
 		{
-			IActorMovementController::SStats stats;
-			if (m_pMovementController->GetStats(stats) && stats.idle == true)
+			if (g_pGame->GetCVars()->g_enableIdleCheck == 1)
 			{
-				if (GetGameObject()->IsProbablyVisible() == false && GetGameObject()->IsProbablyDistant())
+				IActorMovementController::SStats stats;
+				if (m_pMovementController->GetStats(stats) && stats.idle == true)
 				{
-					CPlayerMovementController* pMC = static_cast<CPlayerMovementController*> (m_pMovementController);
-					float frameTime = gEnv->pTimer->GetFrameTime();
-					pMC->IdleUpdate(frameTime);
-					return;
+					if (GetGameObject()->IsProbablyVisible() == false && GetGameObject()->IsProbablyDistant())
+					{
+						CPlayerMovementController* pMC = static_cast<CPlayerMovementController*> (m_pMovementController);
+						float frameTime = gEnv->pTimer->GetFrameTime();
+						pMC->IdleUpdate(frameTime);
+						return;
+					}
 				}
 			}
 		}
@@ -2139,7 +2142,11 @@ void CPlayer::SufferingHighLatency(bool highLatency)
 			m_pPlayerInput->Reset();
 
 		//CryMP: Restore stance after network lag
-		SetStance(previousStance);
+		//Server: Don't do this on server!
+		if (!gEnv->bServer)
+		{
+			SetStance(previousStance);
+		}
 
 		if (IVehicle* pVehicle = GetLinkedVehicle())
 		{
